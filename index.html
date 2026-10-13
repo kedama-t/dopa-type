@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DOPA TYPE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+1+Code:wght@500;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Rubik+Mono+One&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet. HUD rail on top, a single glowing question card at center,
+   live-stats rail on the right in endless mode. Deep ultramarine night + magenta / cyan / gold neon. */
+:root {
+  --bg: #0a0628;
+  --bg-2: #170b4a;
+  --panel: rgba(28, 16, 84, .72);
+  --line: rgba(160, 140, 255, .28);
+  --ink: #f5f1ff;
+  --mute: #a39bd8;
+  --dim: #5f56a0;
+  --hot: #ff2e88;
+  --cyan: #1de9ff;
+  --gold: #ffd23f;
+  --miss: #ff4057;
+  --good: #4dffa6;
+
+  --f-display: 'Dela Gothic One', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+  --f-body: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+  --f-num: 'Rubik Mono One', 'Arial Black', 'Impact', sans-serif;
+  --f-code: 'M PLUS 1 Code', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(120% 80% at 50% 110%, #3a0f6e 0%, transparent 60%),
+    radial-gradient(80% 60% at 50% -10%, #12206e 0%, transparent 70%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+#bg, #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#bg { z-index: 0; }
+#fx { z-index: 40; }
+#flash { position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0; background: var(--ink); }
+#vignette { position: fixed; inset: 0; z-index: 29; pointer-events: none; opacity: 0;
+  box-shadow: inset 0 0 160px 40px var(--miss); }
+#popLayer { position: fixed; inset: 0; z-index: 45; pointer-events: none; overflow: hidden; }
+
+body.fever::before {
+  content: ""; position: fixed; inset: -50%; z-index: 0; pointer-events: none;
+  background: conic-gradient(from 0deg, #ff2e8833, #ffd23f33, #4dffa633, #1de9ff33, #8a5cff33, #ff2e8833);
+  animation: spin 6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#app {
+  position: relative; z-index: 10;
+  max-width: 1180px; margin: 0 auto;
+  padding-inline: 16px; padding-block: 18px;
+  min-height: 100%;
+  display: flex; flex-direction: column;
+}
+.screen { flex: 1; display: flex; flex-direction: column; }
+
+/* ---------- TITLE ---------- */
+#title { align-items: center; gap: 28px; padding-block: 2vh 24px; }
+.logo {
+  font-family: var(--f-num); font-size: clamp(48px, 10vw, 112px); line-height: .95;
+  letter-spacing: -.02em; text-align: center; margin: 0;
+  color: var(--ink);
+  text-shadow: 4px 0 var(--hot), -4px 0 var(--cyan), 0 0 40px rgba(255, 46, 136, .6);
+  animation: glitch 2.6s infinite steps(1);
+}
+.logo span { color: var(--gold); }
+@keyframes glitch {
+  0%, 88%, 100% { text-shadow: 4px 0 var(--hot), -4px 0 var(--cyan), 0 0 40px rgba(255,46,136,.6); transform: none; }
+  90% { text-shadow: -7px 2px var(--hot), 7px -2px var(--cyan), 0 0 60px rgba(29,233,255,.8); transform: skewX(-6deg); }
+  93% { text-shadow: 9px -1px var(--hot), -9px 1px var(--cyan), 0 0 60px rgba(255,210,63,.8); transform: skewX(4deg) translateX(4px); }
+  96% { text-shadow: 2px 0 var(--hot), -2px 0 var(--cyan); transform: none; }
+}
+.tagline { font-family: var(--f-display); font-size: clamp(18px, 3vw, 28px); margin: -10px 0 0; text-align: center;
+  background: linear-gradient(90deg, var(--hot), var(--gold), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.subline { color: var(--mute); text-align: center; margin: -14px 0 0; font-size: 14px; }
+.subline kbd, .kbd { font-family: var(--f-code); font-weight: 700; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--ink); }
+
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; }
+.mode {
+  position: relative; padding: 20px 20px 18px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  backdrop-filter: blur(6px);
+}
+.mode::after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none;
+  background: linear-gradient(135deg, var(--c1), transparent 40%, transparent 60%, var(--c2)); opacity: .55;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 2px; }
+.mode.m-time { --c1: var(--hot); --c2: var(--gold); }
+.mode.m-sprint { --c1: var(--cyan); --c2: var(--good); }
+.mode.m-endless { --c1: #8a5cff; --c2: var(--hot); }
+.mode h2 { font-family: var(--f-display); font-weight: 400; font-size: 26px; margin: 0; line-height: 1.1; }
+.mode h2 small { display: block; font-family: var(--f-num); font-size: 12px; letter-spacing: .12em; color: var(--c1); margin-bottom: 6px; }
+.mode p { margin: 0; color: var(--mute); font-size: 13.5px; line-height: 1.65; }
+.vbtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.vbtn {
+  flex: 1 1 0; min-width: 84px; cursor: pointer; border-radius: 12px; padding: 12px 10px 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.02));
+  border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.vbtn:hover { transform: translateY(-3px); border-color: var(--c1); box-shadow: 0 8px 28px -6px var(--c1); }
+.vbtn b { font-family: var(--f-num); font-size: 18px; font-weight: 400; }
+.vbtn .best { font-family: var(--f-code); font-size: 11px; color: var(--gold); min-height: 1.3em; }
+.vbtn .k { font-family: var(--f-code); font-size: 11px; color: var(--mute); }
+
+.settings { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; align-items: center; color: var(--mute); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-left: 6px; vertical-align: middle; }
+.seg button { background: transparent; border: 0; padding: 6px 12px; cursor: pointer; color: var(--mute); }
+.seg button[aria-pressed="true"] { background: var(--hot); color: #fff; }
+.settings input[type=range] { vertical-align: middle; accent-color: var(--hot); width: 110px; }
+.howto { max-width: 760px; color: var(--mute); font-size: 13px; line-height: 1.8; text-align: center; margin: 0; }
+
+/* ---------- GAME ---------- */
+#game { gap: 14px; }
+.hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 16px; }
+.hud-l { min-width: 0; }
+.mode-label { font-family: var(--f-num); font-size: 12px; letter-spacing: .14em; color: var(--cyan); }
+.time { font-family: var(--f-num); font-size: clamp(28px, 4.4vw, 46px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.time.warn { color: var(--miss); animation: pulse .5s infinite alternate; }
+@keyframes pulse { to { transform: scale(1.06); text-shadow: 0 0 24px var(--miss); } }
+.bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 6px; max-width: 320px; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--hot)); border-radius: 99px; transition: width .15s linear; }
+.hud-c { text-align: center; }
+.label { font-family: var(--f-num); font-size: 11px; letter-spacing: .2em; color: var(--mute); }
+.score { font-family: var(--f-num); font-size: clamp(30px, 5vw, 54px); line-height: 1; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #fff 30%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 14px rgba(255,210,63,.45)); }
+.hud-r { display: flex; justify-content: flex-end; align-items: flex-end; gap: 12px; }
+.combo { text-align: right; line-height: 1; }
+.combo span { display: block; font-family: var(--f-num); font-size: clamp(34px, 5.6vw, 60px); color: var(--hot); text-shadow: 0 0 22px rgba(255,46,136,.7); font-variant-numeric: tabular-nums; }
+.combo small { font-family: var(--f-num); font-size: 11px; letter-spacing: .25em; color: var(--mute); }
+.combo.t0 span { color: var(--dim); text-shadow: none; }
+.mult { font-family: var(--f-num); font-size: 18px; padding: 6px 10px; border-radius: 10px; border: 2px solid currentColor; color: var(--mute); }
+.mult.t1 { color: var(--cyan); } .mult.t2 { color: var(--good); } .mult.t3 { color: var(--gold); }
+.mult.t4 { color: var(--hot); } .mult.t5 { animation: rainbow 1s linear infinite; }
+@keyframes rainbow { 0%{color:#ff2e88} 25%{color:#ffd23f} 50%{color:#4dffa6} 75%{color:#1de9ff} 100%{color:#ff2e88} }
+
+.substats { display: flex; flex-wrap: wrap; gap: 6px 20px; font-family: var(--f-code); font-size: 13px; color: var(--mute); }
+.substats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.fever-tag { font-family: var(--f-num); color: var(--gold); letter-spacing: .1em; animation: rainbow .8s linear infinite; }
+
+.play { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: center; }
+#game.endless .play { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+#stage { display: flex; flex-direction: column; gap: 14px; justify-content: center; min-height: 340px; }
+
+.qcard {
+  position: relative; border-radius: 26px; padding: 30px clamp(18px, 4vw, 44px) 28px;
+  background: linear-gradient(160deg, rgba(40, 22, 110, .88), rgba(18, 10, 58, .92));
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 80px -30px rgba(255, 46, 136, .45), inset 0 1px 0 rgba(255,255,255,.08);
+  display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;
+  min-width: 0;
+}
+body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot), inset 0 1px 0 rgba(255,255,255,.1); }
+.qnum { position: absolute; top: 12px; left: 18px; font-family: var(--f-num); font-size: 12px; color: var(--dim); letter-spacing: .1em; }
+.qtext { position: relative; font-family: var(--f-display); font-size: clamp(26px, 4.6vw, 50px); line-height: 1.25; text-wrap: balance; color: rgba(245,241,255,.32); }
+.qtext .over { position: absolute; inset: 0; color: transparent;
+  background: linear-gradient(90deg, var(--cyan), var(--gold) 60%, var(--hot)); -webkit-background-clip: text; background-clip: text;
+  clip-path: inset(0 calc(100% - var(--p, 0%)) 0 0); transition: clip-path .08s linear; }
+.qkana { font-size: clamp(15px, 2vw, 19px); color: var(--mute); font-weight: 700; letter-spacing: .04em; }
+.qkana .d { color: var(--cyan); }
+.qroma { font-family: var(--f-code); font-weight: 700; font-size: clamp(22px, 3.4vw, 36px); letter-spacing: .04em; word-break: break-all; line-height: 1.35; }
+.qroma .d { color: var(--cyan); text-shadow: 0 0 12px rgba(29,233,255,.55); }
+.qroma .c { color: var(--ink); background: rgba(255, 46, 136, .35); border-radius: 4px; box-shadow: 0 3px 0 var(--hot); }
+.qroma .c.bad { background: var(--miss); animation: badk .25s; }
+@keyframes badk { 0%,100%{transform:none} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+.qroma .r { color: rgba(245,241,255,.45); }
+.qroma.hide-guide .r, .qroma.hide-guide .c { color: transparent; text-shadow: none; }
+.enter {
+  margin-top: 4px; font-family: var(--f-num); font-size: 15px; letter-spacing: .1em;
+  padding: 12px 22px 10px 26px; border-radius: 12px 12px 12px 12px;
+  border: 2px solid var(--dim); color: var(--dim);
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: all .12s;
+}
+.enter .arw { font-size: 22px; line-height: 1; }
+.enter.ready { color: #1a0630; background: var(--gold); border-color: var(--gold);
+  box-shadow: 0 0 0 6px rgba(255,210,63,.18), 0 0 40px var(--gold); animation: enterpulse .45s infinite alternate; }
+@keyframes enterpulse { to { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(255,210,63,.08), 0 0 70px var(--gold); } }
+.next { color: var(--mute); font-size: 13px; text-align: center; min-height: 1.5em; }
+.next b { font-family: var(--f-num); font-weight: 400; color: var(--dim); margin-right: 8px; font-size: 11px; letter-spacing: .15em; }
+.hint { color: var(--dim); font-size: 12px; text-align: center; margin: 0; }
+
+#side { display: none; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+#game.endless #side { display: flex; }
+#side h3 { margin: 0; font-family: var(--f-num); font-weight: 400; font-size: 13px; letter-spacing: .2em; color: var(--cyan); }
+.stbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.stbl th, .stbl td { padding: 7px 4px; text-align: right; border-bottom: 1px solid rgba(160,140,255,.14); }
+.stbl thead th { font-size: 11px; color: var(--mute); font-weight: 700; }
+.stbl tbody th { text-align: left; font-size: 12px; color: var(--mute); font-weight: 700; white-space: nowrap; }
+.stbl td { font-family: var(--f-code); font-weight: 700; font-size: 15px; }
+.stbl td.big { font-size: 19px; }
+.up { color: var(--good); } .down { color: var(--miss); }
+.stbl .span { display: block; font-size: 10px; color: var(--dim); font-weight: 500; }
+.chartwrap { position: relative; }
+#chart { width: 100%; height: 130px; display: block; border-radius: 10px; background: rgba(0,0,0,.18); }
+.cap { font-size: 11px; color: var(--dim); margin-top: 4px; }
+.sidebest { display: flex; justify-content: space-between; font-size: 12px; color: var(--mute); }
+.sidebest b { font-family: var(--f-code); color: var(--gold); font-size: 15px; }
+
+/* overlays */
+#countdown { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; pointer-events: none; }
+#countdown span { font-family: var(--f-num); font-size: clamp(120px, 26vw, 280px); color: var(--ink);
+  text-shadow: 6px 0 var(--hot), -6px 0 var(--cyan), 0 0 80px var(--hot); animation: cd .6s cubic-bezier(.2,1.6,.4,1) both; }
+#countdown span.go { color: var(--gold); text-shadow: 6px 0 var(--hot), -6px 0 var(--cyan), 0 0 100px var(--gold); }
+@keyframes cd { 0% { transform: scale(2.6); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+#banner { position: fixed; left: 0; right: 0; top: 34%; z-index: 48; pointer-events: none; display: flex; justify-content: center; }
+.bn { text-align: center; animation: bn 1.3s cubic-bezier(.2,1.4,.4,1) both; padding-inline: 16px; }
+.bn .m { font-family: var(--f-num); font-size: clamp(36px, 8vw, 92px); line-height: 1; color: var(--gold);
+  text-shadow: 5px 0 var(--hot), -5px 0 var(--cyan), 0 0 50px rgba(255,210,63,.8); white-space: nowrap; }
+.bn .s { font-family: var(--f-display); font-size: clamp(16px, 2.4vw, 24px); color: var(--ink); margin-top: 8px; text-shadow: 0 0 18px var(--hot); }
+.bn.red .m { color: var(--miss); text-shadow: 4px 0 #000, 0 0 40px var(--miss); }
+.bn.cyan .m { color: var(--cyan); text-shadow: 5px 0 var(--hot), 0 0 50px var(--cyan); }
+@keyframes bn { 0% { transform: scale(3) rotate(-8deg); opacity: 0; } 18% { transform: scale(.92) rotate(-3deg); opacity: 1; }
+  28% { transform: scale(1.04) rotate(-3deg); } 80% { transform: scale(1) rotate(-3deg); opacity: 1; } 100% { transform: scale(1.1) rotate(-3deg); opacity: 0; } }
+
+.pop { position: absolute; transform: translate(-50%, -50%); font-family: var(--f-num); white-space: nowrap; animation: pop .9s ease-out forwards; }
+.pop.sc { color: var(--gold); font-size: 26px; text-shadow: 0 0 16px var(--gold); }
+.pop.miss { color: var(--miss); font-size: 20px; text-shadow: 0 0 12px var(--miss); }
+.pop.jdg { font-family: var(--f-num); font-size: clamp(30px, 5vw, 54px); color: var(--cyan); text-shadow: 4px 0 var(--hot), 0 0 30px var(--cyan); animation: popbig 1s cubic-bezier(.2,1.6,.4,1) forwards; }
+.pop.jdg.perfect { color: var(--gold); text-shadow: 4px 0 var(--hot), -4px 0 var(--cyan), 0 0 40px var(--gold); }
+.pop.jdg small { display: block; font-family: var(--f-display); font-size: .38em; color: var(--ink); text-shadow: 0 0 10px var(--hot); letter-spacing: .05em; }
+.pop.note { font-family: var(--f-display); color: var(--ink); font-size: 18px; text-shadow: 0 0 12px var(--hot); }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -20%) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -190%) scale(1); } }
+@keyframes popbig { 0% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(.95); } 70% { opacity: 1; transform: translate(-50%, -70%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -110%) scale(1.05); } }
+
+#ime { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; padding: 12px 20px; border-radius: 12px;
+  background: var(--miss); color: #fff; font-weight: 800; box-shadow: 0 10px 40px -8px var(--miss); max-width: calc(100% - 32px); text-align: center; }
+
+/* ---------- RESULT ---------- */
+#result { align-items: center; justify-content: center; gap: 22px; padding-block: 3vh; }
+.res-head { text-align: center; }
+.res-head h2 { margin: 0; font-family: var(--f-num); font-weight: 400; font-size: clamp(34px, 6vw, 64px); letter-spacing: .04em;
+  text-shadow: 4px 0 var(--hot), -4px 0 var(--cyan); }
+.res-head div { font-family: var(--f-num); font-size: 12px; letter-spacing: .2em; color: var(--cyan); margin-top: 6px; }
+.res-main { display: flex; gap: clamp(20px, 5vw, 64px); align-items: center; justify-content: center; flex-wrap: wrap; }
+.rank-wrap { text-align: center; }
+.rank { font-family: var(--f-num); font-size: clamp(110px, 18vw, 200px); line-height: .9; color: var(--gold);
+  text-shadow: 8px 0 var(--hot), -8px 0 var(--cyan), 0 0 80px rgba(255,210,63,.8); animation: stamp .7s .35s cubic-bezier(.2,1.8,.4,1) both; }
+.rank.r-low { color: var(--mute); text-shadow: 6px 0 var(--dim), 0 0 30px rgba(160,140,255,.4); }
+@keyframes stamp { 0% { transform: scale(5) rotate(-25deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotate(-8deg); opacity: 1; } }
+.rank-name { font-family: var(--f-display); font-size: 20px; margin-top: 10px; }
+.prim { text-align: center; min-width: 0; }
+.prim .v { font-family: var(--f-num); font-size: clamp(44px, 8vw, 84px); line-height: 1.05; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #fff 30%, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.newrec { display: inline-block; margin-top: 6px; font-family: var(--f-num); font-size: 18px; color: #1a0630; background: var(--gold);
+  padding: 6px 14px; border-radius: 8px; animation: rainbowbg 1s linear infinite, enterpulse .4s infinite alternate; }
+@keyframes rainbowbg { 0%{background:#ffd23f} 33%{background:#ff2e88} 66%{background:#1de9ff} 100%{background:#ffd23f} }
+.bestline { font-family: var(--f-code); font-size: 13px; color: var(--mute); margin-top: 6px; }
+.res-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 860px; margin: 0; }
+.res-grid div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.res-grid dt { font-size: 11px; color: var(--mute); font-weight: 700; }
+.res-grid dd { margin: 4px 0 0; font-family: var(--f-code); font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.weak { font-size: 13px; color: var(--mute); text-align: center; }
+.weak .kbd { margin: 0 3px; color: var(--miss); }
+.res-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.btn { cursor: pointer; border-radius: 14px; padding: 14px 26px; font-family: var(--f-display); font-size: 17px; border: 2px solid var(--line); background: rgba(255,255,255,.05); transition: transform .12s, box-shadow .12s; }
+.btn:hover { transform: translateY(-2px); }
+.btn.primary { background: var(--hot); border-color: var(--hot); color: #fff; box-shadow: 0 10px 34px -8px var(--hot); }
+.btn .kbd { margin-right: 6px; font-size: 12px; }
+
+@media (max-width: 900px) {
+  .modes { grid-template-columns: minmax(0, 1fr); }
+  #game.endless .play { grid-template-columns: minmax(0, 1fr); }
+  .res-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .hud { grid-template-columns: 1fr 1fr; }
+  .hud-c { grid-column: 1 / -1; order: -1; }
+  .mult { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo, .enter.ready, .time.warn, body.fever::before, .newrec { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="flash"></div>
+<div id="vignette"></div>
+
+<div id="app">
+  <!-- TITLE -->
+  <section id="title" class="screen">
+    <h1 class="logo">DOPA<br><span>TYPE</span></h1>
+    <p class="tagline">打て。光れ。脳汁を出せ。</p>
+    <p class="subline">ローマ字で打ち切ったら <kbd>Enter</kbd> で次のお題へ。IME は <b>半角英数</b> にしてプレイ。</p>
+
+    <div class="modes">
+      <div class="mode m-time">
+        <h2><small>TIME ATTACK</small>タイムアタック</h2>
+        <p>制限時間内に何問・何打鍵いけるか。スコアはコンボ倍率で跳ね上がる。</p>
+        <div class="vbtns">
+          <button class="vbtn" data-mode="time-60"><b>60秒</b><span class="best" data-best="time-60"></span><span class="k">[1]</span></button>
+          <button class="vbtn" data-mode="time-180"><b>180秒</b><span class="best" data-best="time-180"></span><span class="k">[2]</span></button>
+        </div>
+      </div>
+      <div class="mode m-sprint">
+        <h2><small>SPRINT</small>スプリント</h2>
+        <p>決まった問題数を打ち切るまでのタイムを競う。最後の Enter でタイマー停止。</p>
+        <div class="vbtns">
+          <button class="vbtn" data-mode="sprint-10"><b>10問</b><span class="best" data-best="sprint-10"></span><span class="k">[3]</span></button>
+          <button class="vbtn" data-mode="sprint-20"><b>20問</b><span class="best" data-best="sprint-20"></span><span class="k">[4]</span></button>
+          <button class="vbtn" data-mode="sprint-30"><b>30問</b><span class="best" data-best="sprint-30"></span><span class="k">[5]</span></button>
+        </div>
+      </div>
+      <div class="mode m-endless">
+        <h2><small>ENDLESS</small>エンドレス</h2>
+        <p>終わりなし。全体・直近3分・直近1分の速度とミスを常時表示。<kbd class="kbd">Esc</kbd> で終了。</p>
+        <div class="vbtns">
+          <button class="vbtn" data-mode="endless"><b>START</b><span class="best" data-best="endless"></span><span class="k">[6]</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings">
+      <span>サウンド<span class="seg" id="segSound"><button data-v="1">ON</button><button data-v="0">OFF</button></span></span>
+      <span><label for="vol">音量</label> <input type="range" id="vol" min="0" max="1" step="0.05"></span>
+      <span>演出<span class="seg" id="segFx"><button data-v="2">MAX</button><button data-v="1">普通</button><button data-v="0">控えめ</button></span></span>
+      <span>ガイド<span class="seg" id="segGuide"><button data-v="1">表示</button><button data-v="0">隠す</button></span></span>
+    </div>
+    <p class="howto">ミスで<b>コンボ</b>が途切れる。30コンボごとに<b>スコア倍率</b>が上がり、100コンボで<b>FEVER</b>突入。ノーミスで Enter を叩くと PERFECT ボーナス。<br>「し = si / shi」「ん = n / nn」「っ = 子音重ね / xtu」など主要な入力ゆれに対応。</p>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="screen" hidden>
+    <header class="hud">
+      <div class="hud-l">
+        <div class="mode-label" id="hMode">TIME ATTACK</div>
+        <div class="time" id="hTime">60.0</div>
+        <div class="bar"><i id="hBar"></i></div>
+      </div>
+      <div class="hud-c">
+        <div class="label">SCORE</div>
+        <div class="score" id="hScore">0</div>
+      </div>
+      <div class="hud-r">
+        <div class="mult" id="hMult">×1.0</div>
+        <div class="combo t0" id="hComboWrap"><span id="hCombo">0</span><small>COMBO</small></div>
+      </div>
+    </header>
+    <div class="substats">
+      <span>KPM <b id="hKpm">0</b></span>
+      <span>MISS <b id="hMiss">0</b></span>
+      <span>正確率 <b id="hAcc">100.0</b>%</span>
+      <span>クリア <b id="hWords">0</b>問</span>
+      <span>MAX COMBO <b id="hMaxCombo">0</b></span>
+      <span class="fever-tag" id="hFever" hidden>★ FEVER ★</span>
+    </div>
+
+    <div class="play">
+      <div id="stage">
+        <div class="qcard" id="qcard">
+          <div class="qnum" id="qNum">Q.1</div>
+          <div class="qtext" id="qText"><span class="base" id="qTextBase"></span><span class="over" id="qTextOver" aria-hidden="true"></span></div>
+          <div class="qkana"><span class="d" id="qKanaD"></span><span id="qKanaR"></span></div>
+          <div class="qroma" id="qRoma"><span class="d" id="qRomaD"></span><span class="c" id="qRomaC"></span><span class="r" id="qRomaR"></span></div>
+          <div class="enter" id="enterKey"><span class="arw">⏎</span>ENTER</div>
+        </div>
+        <div class="next" id="next"></div>
+        <p class="hint" id="gameHint">Esc でタイトルへ戻る</p>
+      </div>
+
+      <aside id="side">
+        <h3>LIVE STATS</h3>
+        <table class="stbl">
+          <thead><tr><th></th><th>全体</th><th>直近3分</th><th>直近1分</th></tr></thead>
+          <tbody>
+            <tr><th>速度 KPM</th><td class="big" id="sK0">-</td><td class="big" id="sK3">-</td><td class="big" id="sK1">-</td></tr>
+            <tr><th>打/秒</th><td id="sP0">-</td><td id="sP3">-</td><td id="sP1">-</td></tr>
+            <tr><th>ミス</th><td id="sM0">-</td><td id="sM3">-</td><td id="sM1">-</td></tr>
+            <tr><th>正確率</th><td id="sA0">-</td><td id="sA3">-</td><td id="sA1">-</td></tr>
+            <tr><th>集計幅</th><td id="sS0">-</td><td id="sS3">-</td><td id="sS1">-</td></tr>
+          </tbody>
+        </table>
+        <div class="chartwrap">
+          <canvas id="chart"></canvas>
+          <div class="cap">直近1分KPMの推移（過去3分ぶん）</div>
+        </div>
+        <div class="sidebest"><span>このセッション最高 1分KPM</span><b id="sBest1">-</b></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" class="screen" hidden>
+    <div class="res-head"><h2 id="rTitle">RESULT</h2><div id="rMode"></div></div>
+    <div class="res-main">
+      <div class="rank-wrap"><div class="rank" id="rRank">S</div><div class="rank-name" id="rRankName"></div></div>
+      <div class="prim">
+        <div class="label" id="rPrimLabel">SCORE</div>
+        <div class="v" id="rPrim">0</div>
+        <div class="newrec" id="rNew" hidden>NEW RECORD!!</div>
+        <div class="bestline" id="rBest"></div>
+      </div>
+    </div>
+    <dl class="res-grid" id="rGrid"></dl>
+    <div class="weak" id="rWeak"></div>
+    <div class="res-actions">
+      <button class="btn primary" id="bRetry"><span class="kbd">R</span>もう一回</button>
+      <button class="btn" id="bTitle"><span class="kbd">Esc</span>タイトルへ</button>
+    </div>
+  </section>
+</div>
+
+<div id="countdown"></div>
+<div id="banner"></div>
+<div id="popLayer"></div>
+<div id="ime" hidden>IME が ON になっています。半角英数に切り替えてください</div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+/* =========================================================
+   お題データ  [表示, 読み(ひらがな)]
+   ========================================================= */
+const QUESTIONS = [
+  ['ドーパミンがあふれ出す', 'どーぱみんがあふれだす'],
+  ['今日も一日がんばろう', 'きょうもいちにちがんばろう'],
+  ['タイピングは才能じゃない', 'たいぴんぐはさいのうじゃない'],
+  ['指先に宿る魂', 'ゆびさきにやどるたましい'],
+  ['限界を超えていけ', 'げんかいをこえていけ'],
+  ['コンボが途切れた瞬間', 'こんぼがとぎれたしゅんかん'],
+  ['ガチャで最高レアを引いた', 'がちゃでさいこうれあをひいた'],
+  ['推しが尊すぎてつらい', 'おしがとうとすぎてつらい'],
+  ['締め切りは明日の朝', 'しめきりはあしたのあさ'],
+  ['冷蔵庫のプリンが消えた', 'れいぞうこのぷりんがきえた'],
+  ['全力で走り抜けろ', 'ぜんりょくではしりぬけろ'],
+  ['キーボードが火を噴く', 'きーぼーどがひをふく'],
+  ['エンターキーを強く叩け', 'えんたーきーをつよくたたけ'],
+  ['春はあけぼの', 'はるはあけぼの'],
+  ['吾輩は猫である', 'わがはいはねこである'],
+  ['光の速さで駆け抜ける', 'ひかりのはやさでかけぬける'],
+  ['ラスボスの第二形態', 'らすぼすのだいにけいたい'],
+  ['経験値が二倍になった', 'けいけんちがにばいになった'],
+  ['レベルアップおめでとう', 'れべるあっぷおめでとう'],
+  ['寿司とラーメンと焼肉', 'すしとらーめんとやきにく'],
+  ['深夜のカップラーメン', 'しんやのかっぷらーめん'],
+  ['満員電車に揺られて', 'まんいんでんしゃにゆられて'],
+  ['週末は家でゴロゴロ', 'しゅうまつはいえでごろごろ'],
+  ['新しいスマートフォン', 'あたらしいすまーとふぉん'],
+  ['ログインボーナス受け取り', 'ろぐいんぼーなすうけとり'],
+  ['無限に湧き出るやる気', 'むげんにわきでるやるき'],
+  ['虹色に輝くエフェクト', 'にじいろにかがやくえふぇくと'],
+  ['フィーバータイム突入', 'ふぃーばーたいむとつにゅう'],
+  ['確定演出きたこれ', 'かくていえんしゅつきたこれ'],
+  ['運命の歯車が回り出す', 'うんめいのはぐるまがまわりだす'],
+  ['東京特許許可局', 'とうきょうとっきょきょかきょく'],
+  ['生麦生米生卵', 'なまむぎなまごめなまたまご'],
+  ['隣の客はよく柿食う客だ', 'となりのきゃくはよくかきくうきゃくだ'],
+  ['赤巻紙青巻紙黄巻紙', 'あかまきがみあおまきがみきまきがみ'],
+  ['新人シャンソン歌手', 'しんじんしゃんそんかしゅ'],
+  ['バスガス爆発', 'ばすがすばくはつ'],
+  ['ちりも積もれば山となる', 'ちりもつもればやまとなる'],
+  ['石の上にも三年', 'いしのうえにもさんねん'],
+  ['急がば回れ', 'いそがばまわれ'],
+  ['猿も木から落ちる', 'さるもきからおちる'],
+  ['七転び八起き', 'ななころびやおき'],
+  ['百聞は一見にしかず', 'ひゃくぶんはいっけんにしかず'],
+  ['好きこそものの上手なれ', 'すきこそもののじょうずなれ'],
+  ['笑う門には福来る', 'わらうかどにはふくきたる'],
+  ['雨にも負けず風にも負けず', 'あめにもまけずかぜにもまけず'],
+  ['宇宙の果てまで行こう', 'うちゅうのはてまでいこう'],
+  ['ハイスコアを更新した', 'はいすこあをこうしんした'],
+  ['世界ランキング一位', 'せかいらんきんぐいちい'],
+  ['チャンネル登録よろしく', 'ちゃんねるとうろくよろしく'],
+  ['高評価ボタンを押して', 'こうひょうかぼたんをおして'],
+  ['今日の晩ごはんはカレー', 'きょうのばんごはんはかれー'],
+  ['炭酸水で目を覚ます', 'たんさんすいでめをさます'],
+  ['エナジードリンク三本目', 'えなじーどりんくさんぼんめ'],
+  ['通知が止まらない', 'つうちがとまらない'],
+  ['バズった投稿', 'ばずったとうこう'],
+  ['ショート動画を無限に見る', 'しょーとどうがをむげんにみる'],
+  ['脳汁がドバドバ出る', 'のうじるがどばどばでる'],
+  ['指が勝手に動き出す', 'ゆびがかってにうごきだす'],
+  ['これが本気の速さだ', 'これがほんきのはやさだ'],
+  ['伝説の始まり', 'でんせつのはじまり'],
+  ['必殺技を叩き込め', 'ひっさつわざをたたきこめ'],
+  ['ゲームは一日一時間', 'げーむはいちにちいちじかん'],
+  ['ポテトチップスうすしお味', 'ぽてとちっぷすうすしおあじ'],
+  ['チョコミントは正義', 'ちょこみんとはせいぎ'],
+  ['たこ焼きを八個', 'たこやきをはっこ'],
+  ['抹茶ラテをください', 'まっちゃらてをください'],
+  ['コンビニで新作スイーツ', 'こんびにでしんさくすいーつ'],
+  ['夏祭りの花火大会', 'なつまつりのはなびたいかい'],
+  ['雪だるまを作ろう', 'ゆきだるまをつくろう'],
+  ['桜の花びらが舞う', 'さくらのはなびらがまう'],
+  ['紅葉狩りに出かける', 'もみじがりにでかける'],
+  ['秘密の作戦会議', 'ひみつのさくせんかいぎ'],
+  ['勇者は魔王を倒した', 'ゆうしゃはまおうをたおした'],
+  ['宝箱からミミック', 'たからばこからみみっく'],
+  ['回復アイテムが足りない', 'かいふくあいてむがたりない'],
+  ['セーブしてから寝よう', 'せーぶしてからねよう'],
+  ['ネコはこたつで丸くなる', 'ねこはこたつでまるくなる'],
+  ['犬が全力でしっぽを振る', 'いぬがぜんりょくでしっぽをふる'],
+  ['ペンギンの大行進', 'ぺんぎんのだいこうしん'],
+  ['シャチホコが金色に光る', 'しゃちほこがきんいろにひかる'],
+  ['富士山の頂上で叫ぶ', 'ふじさんのちょうじょうでさけぶ'],
+  ['渋谷のスクランブル交差点', 'しぶやのすくらんぶるこうさてん'],
+  ['ヴァイオリンの音色', 'ゔぁいおりんのねいろ'],
+  ['ティーパーティーへようこそ', 'てぃーぱーてぃーへようこそ'],
+  ['ファンファーレが鳴り響く', 'ふぁんふぁーれがなりひびく'],
+  ['ウィンドウを閉じる', 'うぃんどうをとじる'],
+  ['シェフの気まぐれサラダ', 'しぇふのきまぐれさらだ'],
+  ['ディスコでフィーバー', 'でぃすこでふぃーばー'],
+  ['フォトジェニックな一枚', 'ふぉとじぇにっくないちまい'],
+  ['チェックメイト', 'ちぇっくめいと'],
+  ['最強の称号を手に入れた', 'さいきょうのしょうごうをてにいれた'],
+  ['アルゴリズムを理解する', 'あるごりずむをりかいする'],
+  ['バグのないコードは存在しない', 'ばぐのないこーどはそんざいしない'],
+  ['本番環境で動かない', 'ほんばんかんきょうでうごかない'],
+  ['金曜日の夕方にデプロイ', 'きんようびのゆうがたにでぷろい'],
+  ['キャッシュを消してください', 'きゃっしゅをけしてください'],
+  ['エラーは友達', 'えらーはともだち'],
+  ['コーヒーがないと始まらない', 'こーひーがないとはじまらない'],
+  ['音ゲーで全国一位', 'おとげーでぜんこくいちい'],
+  ['ドラムンベースで踊り明かす', 'どらむんべーすでおどりあかす'],
+  ['ベースラインが気持ちいい', 'べーすらいんがきもちいい'],
+  ['雷が鳴ったらへそを隠せ', 'かみなりがなったらへそをかくせ'],
+  ['一期一会', 'いちごいちえ'],
+  ['温故知新', 'おんこちしん'],
+  ['電光石火', 'でんこうせっか'],
+  ['疾風迅雷', 'しっぷうじんらい'],
+  ['一騎当千', 'いっきとうせん'],
+  ['天上天下唯我独尊', 'てんじょうてんげゆいがどくそん'],
+  ['森羅万象', 'しんらばんしょう'],
+  ['完全無欠のロックンロール', 'かんぜんむけつのろっくんろーる'],
+  ['スマホの充電があと一パーセント', 'すまほのじゅうでんがあといちぱーせんと'],
+  ['課金は計画的に', 'かきんはけいかくてきに'],
+  ['期間限定イベント開催中', 'きかんげんていいべんとかいさいちゅう'],
+  ['今夜は焼肉食べ放題', 'こんやはやきにくたべほうだい'],
+  ['伝説の剣を抜いた', 'でんせつのけんをぬいた'],
+  ['ジェットコースターで絶叫', 'じぇっとこーすたーでぜっきょう'],
+  ['にんじゃりばんばん', 'にんじゃりばんばん'],
+  ['ちゅうちょなく突き進め', 'ちゅうちょなくつきすすめ'],
+  ['きゅうりの一本漬け', 'きゅうりのいっぽんづけ'],
+  ['びっくりするほど速い', 'びっくりするほどはやい'],
+];
+
+/* =========================================================
+   ローマ字入力エンジン（入力ゆれ対応）
+   ========================================================= */
+const KANA = new Map();
+(function buildTable() {
+  const T = `
+あ a|い i yi|う u wu whu|え e|お o
+か ka ca|き ki|く ku cu qu|け ke|こ ko co
+さ sa|し shi si ci|す su|せ se ce|そ so
+た ta|ち chi ti|つ tsu tu|て te|と to
+な na|に ni|ぬ nu|ね ne|の no
+は ha|ひ hi|ふ fu hu|へ he|ほ ho
+ま ma|み mi|む mu|め me|も mo
+や ya|ゆ yu|よ yo
+ら ra|り ri|る ru|れ re|ろ ro
+わ wa|ゐ wyi|ゑ wye|を wo
+が ga|ぎ gi|ぐ gu|げ ge|ご go
+ざ za|じ ji zi|ず zu|ぜ ze|ぞ zo
+だ da|ぢ di|づ du|で de|ど do
+ば ba|び bi|ぶ bu|べ be|ぼ bo
+ぱ pa|ぴ pi|ぷ pu|ぺ pe|ぽ po
+ぁ xa la|ぃ xi li|ぅ xu lu|ぇ xe le|ぉ xo lo
+ゃ xya lya|ゅ xyu lyu|ょ xyo lyo|ゎ xwa lwa
+ゔ vu
+ゔぁ va|ゔぃ vi vyi|ゔぇ ve vye|ゔぉ vo|ゔゅ vyu
+ふぁ fa fwa|ふぃ fi fyi|ふぇ fe fye|ふぉ fo fwo|ふゅ fyu
+てぃ thi|てゅ thu|でぃ dhi|でゅ dhu|とぅ twu|どぅ dwu
+うぃ wi whi|うぇ we whe|うぉ who|いぇ ye
+つぁ tsa|つぃ tsi|つぇ tse|つぉ tso
+くぁ qa kwa|ぐぁ gwa
+ー -|、 ,|。 .|！ !|？ ?|・ /|～ ~`;
+  for (const ent of T.trim().split(/[\n|]/)) {
+    const p = ent.trim().split(/\s+/);
+    if (p.length > 1) KANA.set(p[0], p.slice(1));
+  }
+  const YO = { 'ゃ': 'a', 'ぃ': 'i', 'ゅ': 'u', 'ぇ': 'e', 'ょ': 'o' };
+  const plain = { 'き': ['ky'], 'ぎ': ['gy'], 'に': ['ny'], 'ひ': ['hy'], 'び': ['by'], 'ぴ': ['py'], 'み': ['my'], 'り': ['ry'], 'ぢ': ['dy'] };
+  for (const [k, cs] of Object.entries(plain)) for (const [s, v] of Object.entries(YO)) KANA.set(k + s, cs.map(c => c + v));
+  const special = { 'し': [['sh', 'sy'], ['sy']], 'ち': [['ch', 'ty', 'cy'], ['ty', 'cy']], 'じ': [['j', 'zy', 'jy'], ['zy', 'jy']] };
+  for (const [k, [main, iRow]] of Object.entries(special)) {
+    for (const [s, v] of Object.entries(YO)) KANA.set(k + s, (v === 'i' ? iRow : main).map(c => c + v));
+  }
+})();
+
+function toHira(s) {
+  return s.replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+function makeMatcher(reading) {
+  const s = toHira(reading);
+  const memo = [];
+  function base(i) {
+    const out = [];
+    if (i + 1 < s.length) { const two = KANA.get(s.substr(i, 2)); if (two) two.forEach(r => out.push({ n: 2, r })); }
+    const one = KANA.get(s[i]); if (one) one.forEach(r => out.push({ n: 1, r }));
+    return out;
+  }
+  function cands(i) {
+    if (memo[i]) return memo[i];
+    const ch = s[i];
+    let out = [];
+    if (ch === 'っ') {
+      if (i + 1 < s.length && s[i + 1] !== 'っ' && s[i + 1] !== 'ん') {
+        for (const c of base(i + 1)) {
+          const h = c.r[0];
+          if (/[a-z]/.test(h) && !'aiueon'.includes(h)) {
+            out.push({ n: 1 + c.n, r: h + c.r });
+            if (c.r.startsWith('ch')) out.push({ n: 1 + c.n, r: 't' + c.r });
+          }
+        }
+      }
+      for (const r of ['xtu', 'ltu', 'xtsu', 'ltsu']) out.push({ n: 1, r });
+    } else if (ch === 'ん') {
+      let ok = false;
+      if (s[i + 1] === 'っ') ok = true;
+      else if (i + 1 < s.length && s[i + 1] !== 'ん') {
+        const nx = base(i + 1);
+        ok = nx.length > 0 && nx.every(c => /^[a-z]/.test(c.r) && !'aiueony'.includes(c.r[0]));
+      }
+      if (ok) out.push({ n: 1, r: 'n' });
+      for (const r of ['nn', 'xn', "n'"]) out.push({ n: 1, r });
+    } else {
+      out = base(i);
+    }
+    if (!out.length) out = [{ n: 1, r: ch }];
+    return (memo[i] = out);
+  }
+  function defaultFrom(j) {
+    let o = '';
+    while (j < s.length) { const c = cands(j)[0]; o += c.r; j += c.n; }
+    return o;
+  }
+  const st = { i: 0, buf: '', typed: '' };
+  return {
+    reading,
+    get pos() { return st.i; },
+    done() { return st.i >= s.length && st.buf === ''; },
+    key(c) {
+      if (st.i >= s.length) return false;
+      const t = st.buf + c;
+      const m = cands(st.i).filter(x => x.r.startsWith(t));
+      if (m.length) {
+        st.buf = t;
+        if (m.every(x => x.r === t)) { st.typed += t; st.i += m[0].n; st.buf = ''; }
+        return true;
+      }
+      // 「n」+子音 のように、確定済みの短い候補で区切って次へ進めるケース
+      if (st.buf) {
+        const ex = cands(st.i).find(x => x.r === st.buf);
+        if (ex) {
+          const save = { ...st };
+          st.typed += st.buf; st.i += ex.n; st.buf = '';
+          if (this.key(c)) return true;
+          Object.assign(st, save);
+        }
+      }
+      return false;
+    },
+    guide() {
+      if (st.i >= s.length) return { typed: st.typed + st.buf, rest: '' };
+      const c = cands(st.i).find(x => x.r.startsWith(st.buf)) || cands(st.i)[0];
+      return { typed: st.typed + st.buf, rest: c.r.slice(st.buf.length) + defaultFrom(st.i + c.n) };
+    },
+    fullDefault() { return defaultFrom(0); },
+  };
+}
+
+/* =========================================================
+   ユーティリティ / 設定
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const now = () => performance.now();
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('dopatype:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('dopatype:' + k, JSON.stringify(v)); } catch (e) { } },
+};
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SET = {
+  sound: store.get('sound', true),
+  vol: store.get('vol', 0.6),
+  fx: store.get('fx', reduceMotion ? 0 : 2),
+  guide: store.get('guide', true),
+};
+const FXK = () => [0.2, 0.6, 1][SET.fx];
+const fmt = n => Math.round(n).toLocaleString('ja-JP');
+const fmtSec = ms => (ms / 1000).toFixed(2) + 's';
+const fmtClock = ms => { const t = Math.max(0, Math.floor(ms / 1000)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* =========================================================
+   サウンド（WebAudio で全部合成）
+   ========================================================= */
+const Snd = {
+  ctx: null, master: null, noiseBuf: null,
+  init() {
+    if (!this.ctx) {
+      try {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.master = this.ctx.createGain();
+        const comp = this.ctx.createDynamicsCompressor();
+        this.master.connect(comp).connect(this.ctx.destination);
+        this.setVol(SET.vol);
+        const len = this.ctx.sampleRate;
+        this.noiseBuf = this.ctx.createBuffer(1, len, len);
+        const d = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      } catch (e) { this.ctx = null; }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  setVol(v) { if (this.master) this.master.gain.value = v * 0.9; },
+  ok() { return SET.sound && this.ctx; },
+  tone(f, dur, type = 'square', vol = 0.1, when = 0, slide = 0) {
+    if (!this.ok()) return;
+    const c = this.ctx, t = c.currentTime + when;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.master);
+    o.start(t); o.stop(t + dur + 0.03);
+  },
+  noise(dur, vol = 0.1, when = 0, freq = 2000, type = 'highpass') {
+    if (!this.ok()) return;
+    const c = this.ctx, t = c.currentTime + when;
+    const src = c.createBufferSource(); src.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t); src.stop(t + dur + 0.02);
+  },
+  kick(when = 0, vol = 0.5) { this.tone(160, 0.22, 'sine', vol, when, 40); },
+  key(combo, tier) {
+    const pen = [0, 2, 4, 7, 9];
+    const idx = combo % 15;
+    const semi = pen[idx % 5] + 12 * Math.floor(idx / 5) + (tier >= 3 ? 2 : 0);
+    const f = 523.25 * Math.pow(2, semi / 12);
+    this.tone(f, 0.075, 'square', 0.05);
+    this.tone(f * 2, 0.04, 'sine', 0.035);
+    if (tier >= 3) this.tone(f * 1.5, 0.08, 'triangle', 0.04);
+    this.noise(0.02, 0.03, 0, 6000);
+  },
+  miss() {
+    this.tone(180, 0.18, 'sawtooth', 0.09, 0, 70);
+    this.noise(0.1, 0.06, 0, 400, 'lowpass');
+  },
+  breakCombo() {
+    [392, 311, 233, 175].forEach((f, i) => this.tone(f, 0.14, 'sawtooth', 0.06, i * 0.07));
+  },
+  enter(tier, perfect) {
+    this.kick(0, 0.55);
+    this.noise(0.12, 0.08, 0, 3000);
+    const root = 261.63 * Math.pow(2, Math.min(tier, 5) * 2 / 12);
+    [1, 1.26, 1.5, 2].forEach((m, i) => this.tone(root * m * 2, 0.16, 'triangle', 0.07, i * 0.035));
+    if (perfect) [3, 4, 5, 6].forEach((m, i) => this.tone(root * m * 2, 0.12, 'sine', 0.05, 0.14 + i * 0.04));
+  },
+  ready() { this.tone(1318, 0.09, 'sine', 0.07); this.tone(1760, 0.12, 'sine', 0.05, 0.05); },
+  milestone() {
+    this.kick(0, 0.6);
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(f, 0.18, 'square', 0.05, i * 0.05));
+    this.noise(0.6, 0.06, 0.05, 5000);
+  },
+  count() { this.tone(880, 0.12, 'square', 0.08); this.kick(0, 0.35); },
+  go() { this.kick(0, 0.7); [523, 784, 1047].forEach((f, i) => this.tone(f, 0.35, 'sawtooth', 0.05, i * 0.02)); this.noise(0.4, 0.08, 0, 4000); },
+  tick() { this.tone(1600, 0.04, 'square', 0.05); },
+  finish() {
+    this.kick(0, 0.7); this.kick(0.25, 0.6);
+    [[523, 0], [659, .1], [784, .2], [1047, .3], [784, .45], [1047, .55], [1319, .7]].forEach(([f, w]) => this.tone(f, 0.3, 'square', 0.05, w));
+    this.noise(0.9, 0.06, 0.3, 5000);
+  },
+  select() { this.tone(660, 0.06, 'square', 0.06); this.tone(990, 0.08, 'square', 0.05, 0.05); },
+};
+
+/* =========================================================
+   演出：背景スターフィールド / パーティクル / ポップ
+   ========================================================= */
+const bgc = $('#bg'), bctx = bgc.getContext('2d');
+const fxc = $('#fx'), fctx = fxc.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  for (const c of [bgc, fxc]) { c.width = W * DPR; c.height = H * DPR; }
+  bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawChart();
+}
+window.addEventListener('resize', resize);
+
+const stars = Array.from({ length: 260 }, () => newStar(true));
+function newStar(rand) { return { x: (Math.random() * 2 - 1), y: (Math.random() * 2 - 1), z: rand ? Math.random() : 1, h: Math.random() }; }
+let warp = 0, warpTarget = 0, kick = 0;
+
+function drawBg(dt, t) {
+  const k = dt / 16.67;
+  warp += (warpTarget + kick - warp) * 0.06 * k;
+  kick *= Math.pow(0.9, k);
+  const speed = (0.0025 + warp * 0.02) * k;
+  bctx.globalCompositeOperation = 'source-over';
+  bctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H * 0.45, sc = Math.max(W, H) * 0.5;
+  const fever = document.body.classList.contains('fever');
+  bctx.lineCap = 'round';
+  for (let i = 0; i < stars.length; i++) {
+    const s = stars[i];
+    const pz = s.z;
+    s.z -= speed;
+    if (s.z <= 0.02) { stars[i] = newStar(false); continue; }
+    const x1 = cx + s.x / pz * sc * 0.3, y1 = cy + s.y / pz * sc * 0.3;
+    const x2 = cx + s.x / s.z * sc * 0.3, y2 = cy + s.y / s.z * sc * 0.3;
+    if (x2 < -50 || x2 > W + 50 || y2 < -50 || y2 > H + 50) { stars[i] = newStar(false); continue; }
+    const a = Math.min(1, (1 - s.z) * 1.4);
+    bctx.strokeStyle = fever ? `hsla(${(t * 0.15 + s.h * 360) % 360},100%,65%,${a})`
+      : (s.h < 0.5 ? `rgba(29,233,255,${a * 0.8})` : `rgba(255,120,200,${a * 0.7})`);
+    bctx.lineWidth = Math.max(0.6, (1 - s.z) * 2.6);
+    bctx.beginPath(); bctx.moveTo(x1, y1); bctx.lineTo(x2, y2); bctx.stroke();
+  }
+}
+
+let P = [], RINGS = [];
+const NEON = ['#1de9ff', '#ff2e88', '#ffd23f', '#4dffa6', '#ffffff'];
+function burst(x, y, o = {}) {
+  const n = Math.max(1, Math.round((o.n ?? 14) * FXK()));
+  const colors = o.colors || NEON;
+  for (let i = 0; i < n; i++) {
+    const ang = (o.dir ?? 0) + (Math.random() - 0.5) * (o.spread ?? Math.PI * 2);
+    const sp = (o.spd ?? 5) * (0.35 + Math.random() * 0.9);
+    P.push({
+      x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      g: o.grav ?? 0.12, drag: o.drag ?? 0.97,
+      life: 0, max: (o.life ?? 45) * (0.6 + Math.random() * 0.7),
+      size: (o.size ?? 3) * (0.5 + Math.random()), color: colors[Math.random() * colors.length | 0],
+      shape: o.shape || 'dot', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4,
+    });
+  }
+  if (P.length > 1200) P.splice(0, P.length - 1200);
+}
+function ring(x, y, color, max = 140, w = 4) { if (SET.fx === 0) return; RINGS.push({ x, y, r: 6, max, color, w, life: 1 }); }
+function confetti(n = 120) {
+  n = Math.round(n * FXK());
+  for (let i = 0; i < n; i++) {
+    P.push({ x: Math.random() * W, y: -20 - Math.random() * H * 0.4, vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 3,
+      g: 0.05, drag: 0.995, life: 0, max: 200 + Math.random() * 100, size: 5 + Math.random() * 6,
+      color: NEON[Math.random() * NEON.length | 0], shape: 'rect', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3 });
+  }
+}
+function drawFx(dt) {
+  const k = dt / 16.67;
+  fctx.clearRect(0, 0, W, H);
+  fctx.globalCompositeOperation = 'lighter';
+  for (let i = RINGS.length - 1; i >= 0; i--) {
+    const r = RINGS[i];
+    r.r += (r.max - r.r) * 0.14 * k; r.life -= 0.035 * k;
+    if (r.life <= 0) { RINGS.splice(i, 1); continue; }
+    fctx.globalAlpha = r.life; fctx.strokeStyle = r.color; fctx.lineWidth = r.w * r.life + 0.5;
+    fctx.beginPath(); fctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); fctx.stroke();
+  }
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    p.life += k;
+    if (p.life >= p.max || p.y > H + 40) { P.splice(i, 1); continue; }
+    p.vx *= Math.pow(p.drag, k); p.vy = p.vy * Math.pow(p.drag, k) + p.g * k;
+    p.x += p.vx * k; p.y += p.vy * k; p.rot += p.vr * k;
+    const a = 1 - p.life / p.max;
+    fctx.globalAlpha = a; fctx.fillStyle = p.color;
+    if (p.shape === 'rect') {
+      fctx.globalCompositeOperation = 'source-over';
+      fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+      fctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2); fctx.restore();
+      fctx.globalCompositeOperation = 'lighter';
+    } else if (p.shape === 'star') {
+      fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+      const s = p.size * 1.6;
+      fctx.fillRect(-s, -s / 5, s * 2, s / 2.5); fctx.fillRect(-s / 5, -s, s / 2.5, s * 2);
+      fctx.restore();
+    } else {
+      fctx.beginPath(); fctx.arc(p.x, p.y, p.size * (0.4 + a * 0.6), 0, Math.PI * 2); fctx.fill();
+    }
+  }
+  fctx.globalAlpha = 1; fctx.globalCompositeOperation = 'source-over';
+}
+
+function shake(px = 8, dur = 260) {
+  if (SET.fx === 0) return;
+  px *= SET.fx === 1 ? 0.5 : 1;
+  const kf = [];
+  for (let i = 0; i < 6; i++) kf.push({ transform: `translate(${(Math.random() - 0.5) * px * 2}px, ${(Math.random() - 0.5) * px * 2}px) rotate(${(Math.random() - 0.5) * px * 0.15}deg)` });
+  kf.push({ transform: 'none' });
+  $('#app').animate(kf, { duration: dur, easing: 'ease-out' });
+}
+function flash(color = '#ffffff', peak = 0.35, dur = 260) {
+  if (SET.fx === 0) peak *= 0.3;
+  const el = $('#flash'); el.style.background = color;
+  el.animate([{ opacity: peak }, { opacity: 0 }], { duration: dur, easing: 'ease-out' });
+}
+function missVignette() { $('#vignette').animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); }
+function pop(html, x, y, cls) {
+  const el = document.createElement('div');
+  el.className = 'pop ' + cls; el.innerHTML = html;
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  $('#popLayer').appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+function banner(main, sub = '', cls = '') {
+  const host = $('#banner'); host.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'bn ' + cls;
+  el.innerHTML = `<div class="m">${main}</div>${sub ? `<div class="s">${sub}</div>` : ''}`;
+  host.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+function bump(el, s = 1.35, d = 140) { el.animate([{ transform: `scale(${s})` }, { transform: 'scale(1)' }], { duration: d, easing: 'ease-out' }); }
+function rectCenter(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r }; }
+
+/* =========================================================
+   ゲーム本体
+   ========================================================= */
+const MODES = {
+  'time-60': { mode: 'time', limit: 60, label: 'TIME ATTACK · 60s' },
+  'time-180': { mode: 'time', limit: 180, label: 'TIME ATTACK · 180s' },
+  'sprint-10': { mode: 'sprint', count: 10, label: 'SPRINT · 10 WORDS' },
+  'sprint-20': { mode: 'sprint', count: 20, label: 'SPRINT · 20 WORDS' },
+  'sprint-30': { mode: 'sprint', count: 30, label: 'SPRINT · 30 WORDS' },
+  'endless': { mode: 'endless', label: 'ENDLESS' },
+};
+const TIERS = [0, 30, 60, 100, 150, 220];
+const MULTS = [1, 1.5, 2, 2.5, 3, 4];
+const MILESTONES = [50, 100, 150, 200, 300, 400, 500, 750, 1000];
+const tierOf = c => { let t = 0; for (let i = 0; i < TIERS.length; i++) if (c >= TIERS[i]) t = i; return t; };
+
+let screen = 'title';
+let G = null;
+let resultAt = 0;
+let lastMode = 'time-60';
+
+function showScreen(id) {
+  for (const s of ['title', 'game', 'result']) $('#' + s).hidden = s !== id;
+  screen = id;
+}
+
+function startGame(id) {
+  Snd.init();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  lastMode = id;
+  const cfg = MODES[id];
+  G = {
+    id, cfg, mode: cfg.mode, state: 'countdown',
+    startT: 0, endT: 0,
+    score: 0, disp: 0, combo: 0, maxCombo: 0, tier: 0,
+    correct: 0, miss: 0, words: 0, perfects: 0,
+    wordMiss: 0, wordStart: 0, wordKeys: 0,
+    events: [], missKeys: {},
+    deck: shuffle(QUESTIONS), q: null, m: null, qn: 0,
+    samples: [], best1: 0, lastSample: 0, lastStat: 0, lastTick: -1, warned: false, nextMinute: 60000,
+  };
+  document.body.classList.remove('fever');
+  $('#game').classList.toggle('endless', G.mode === 'endless');
+  $('#hMode').textContent = cfg.label;
+  $('#gameHint').textContent = G.mode === 'endless' ? 'Esc で終了してリザルトへ' : 'Esc でタイトルへ戻る';
+  $('#hTime').classList.remove('warn');
+  $('#qRoma').classList.toggle('hide-guide', !SET.guide);
+  $('#hFever').hidden = true;
+  resetStatsPanel();
+  showScreen('game');
+  nextQuestion(true);
+  updateHud(true);
+  countdown();
+}
+
+function countdown() {
+  const host = $('#countdown');
+  const seq = ['3', '2', '1', 'GO!'];
+  let i = 0;
+  const step = () => {
+    if (!G || G.state !== 'countdown') { host.innerHTML = ''; return; }
+    if (i >= seq.length) { host.innerHTML = ''; begin(); return; }
+    const v = seq[i];
+    host.innerHTML = `<span class="${v === 'GO!' ? 'go' : ''}">${v}</span>`;
+    if (v === 'GO!') { Snd.go(); flash('#ffd23f', 0.35, 400); ring(W / 2, H / 2, '#ffd23f', Math.max(W, H) * 0.6, 8); kick = 2; }
+    else Snd.count();
+    i++;
+    G._cd = setTimeout(step, v === 'GO!' ? 380 : 600);
+  };
+  step();
+}
+function begin() {
+  G.state = G.m.done() ? 'enter' : 'play';
+  G.startT = now();
+  G.wordStart = G.startT;
+}
+
+function nextQuestion(first) {
+  if (!G.deck.length) G.deck = shuffle(QUESTIONS);
+  G.q = G.deck.pop();
+  G.m = makeMatcher(G.q[1]);
+  G.qn++;
+  G.wordMiss = 0; G.wordKeys = 0; G.wordStart = now();
+  $('#qTextBase').textContent = G.q[0];
+  $('#qTextOver').textContent = G.q[0];
+  $('#qNum').textContent = G.mode === 'sprint' ? `Q.${G.qn} / ${G.cfg.count}` : `Q.${G.qn}`;
+  const nx = G.deck[G.deck.length - 1];
+  const showNext = !(G.mode === 'sprint' && G.qn >= G.cfg.count);
+  $('#next').innerHTML = showNext && nx ? `<b>NEXT</b>${nx[0]}` : '';
+  renderQ();
+  if (!first) {
+    $('#qcard').animate([
+      { transform: 'translateY(26px) scale(.94)', opacity: 0, filter: 'blur(6px)' },
+      { transform: 'none', opacity: 1, filter: 'blur(0)' },
+    ], { duration: 220, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+  }
+}
+
+function renderQ() {
+  const g = G.m.guide();
+  $('#qRomaD').textContent = g.typed;
+  $('#qRomaC').textContent = g.rest.slice(0, 1);
+  $('#qRomaR').textContent = g.rest.slice(1);
+  const pos = G.m.pos;
+  $('#qKanaD').textContent = G.q[1].slice(0, pos);
+  $('#qKanaR').textContent = G.q[1].slice(pos);
+  const total = g.typed.length + g.rest.length;
+  $('#qText').style.setProperty('--p', (total ? g.typed.length / total * 100 : 100) + '%');
+  $('#enterKey').classList.toggle('ready', G.m.done());
+}
+
+function cursorPoint() {
+  const c = $('#qRomaC');
+  if (c.textContent) { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2 }; }
+  const d = $('#qRomaD').getBoundingClientRect();
+  return { x: d.right, y: d.top + d.height / 2 };
+}
+
+function logEvent(ok) { G.events.push({ t: now(), ok }); }
+
+function hit() {
+  G.correct++; G.wordKeys++;
+  G.combo++; if (G.combo > G.maxCombo) G.maxCombo = G.combo;
+  logEvent(true);
+  const tier = tierOf(G.combo);
+  if (tier !== G.tier) setTier(tier);
+  G.score += 10 * MULTS[G.tier];
+  renderQ();
+  const p = cursorPoint();
+  burst(p.x, p.y, { n: 6 + G.tier * 3, spd: 3 + G.tier, life: 26, size: 2.4, grav: 0.05 });
+  if (G.tier >= 3 && SET.fx === 2) burst(p.x, p.y, { n: 3, spd: 7, life: 30, shape: 'star', size: 2, grav: 0 });
+  kick = Math.min(kick + 0.12, 1.4);
+  Snd.key(G.combo, G.tier);
+  bump($('#hCombo'), 1.25 + G.tier * 0.04, 110);
+  if (MILESTONES.includes(G.combo)) milestone(G.combo);
+  if (G.m.done()) {
+    G.state = 'enter';
+    Snd.ready();
+    const ek = rectCenter($('#enterKey'));
+    ring(ek.x, ek.y, '#ffd23f', 90, 3);
+  }
+  updateHud();
+}
+
+function missKey(kind) {
+  G.miss++; G.wordMiss++;
+  logEvent(false);
+  const exp = kind === 'needEnter' ? '⏎' : (G.m.guide().rest[0] || '⏎');
+  G.missKeys[exp] = (G.missKeys[exp] || 0) + 1;
+  if (G.combo >= 20) {
+    Snd.breakCombo();
+    const cc = rectCenter($('#hCombo'));
+    pop(`COMBO BREAK<br><small style="font-size:.6em">${G.combo}</small>`, cc.x - 40, cc.y + 40, 'miss');
+    burst(cc.x, cc.y, { n: 30, colors: ['#ff4057', '#5f56a0', '#ffffff'], spd: 6, life: 50, shape: 'rect', size: 6, grav: 0.3 });
+  }
+  G.combo = 0;
+  if (G.tier !== 0) setTier(0);
+  Snd.miss();
+  shake(10, 240);
+  missVignette();
+  const c = $('#qRomaC');
+  c.classList.remove('bad'); void c.offsetWidth; c.classList.add('bad');
+  const p = cursorPoint();
+  if (kind === 'enterEarly') pop('まだ途中!', p.x, p.y - 36, 'miss');
+  else if (kind === 'needEnter') { const ek = rectCenter($('#enterKey')); pop('ENTER で次へ!', ek.x, ek.y - 40, 'miss'); }
+  else pop('MISS', p.x, p.y - 36, 'miss');
+  $('#qcard').animate([{ transform: 'translateX(-10px)' }, { transform: 'translateX(9px)' }, { transform: 'translateX(-5px)' }, { transform: 'none' }], { duration: 220 });
+  updateHud();
+}
+
+function setTier(t) {
+  const up = t > G.tier;
+  G.tier = t;
+  warpTarget = t * 0.25;
+  const fever = t >= 3;
+  if (fever && !document.body.classList.contains('fever')) {
+    banner('FEVER!!', 'スコア倍率アップ中 ― 指を止めるな', '');
+    flash('#ff2e88', 0.4, 500);
+    confetti(80);
+  }
+  document.body.classList.toggle('fever', fever);
+  $('#hFever').hidden = !fever;
+  if (up && t > 0) {
+    const m = rectCenter($('#hMult'));
+    ring(m.x, m.y, '#4dffa6', 80, 3);
+    burst(m.x, m.y, { n: 20, spd: 5, life: 40 });
+  }
+}
+
+function milestone(c) {
+  Snd.milestone();
+  banner(`${c} COMBO!!`, c >= 300 ? '人間やめてる' : c >= 150 ? '止まらない、止められない' : 'いい流れ！', 'cyan');
+  flash('#1de9ff', 0.35, 420);
+  shake(14, 380);
+  confetti(c >= 200 ? 200 : 110);
+  ring(W / 2, H / 2, '#1de9ff', Math.max(W, H) * 0.7, 10);
+  kick = 2.4;
+}
+
+function completeWord() {
+  const t = now();
+  G.correct++; G.combo++; if (G.combo > G.maxCombo) G.maxCombo = G.combo;
+  logEvent(true);
+  const tier = tierOf(G.combo);
+  if (tier !== G.tier) setTier(tier);
+  G.words++;
+  const keys = G.wordKeys + 1;
+  const sec = Math.max(0.2, (t - G.wordStart) / 1000);
+  const kps = keys / sec;
+  const perfect = G.wordMiss === 0;
+  if (perfect) G.perfects++;
+  let bonus = Math.round(keys * 15 * MULTS[G.tier] * (perfect ? 1.5 : 1) * Math.min(2.5, 0.6 + kps / 5));
+  G.score += 10 * MULTS[G.tier] + bonus;
+
+  const speedName = kps >= 9 ? 'GODSPEED' : kps >= 7 ? 'AMAZING' : kps >= 5.5 ? 'GREAT' : kps >= 4 ? 'NICE' : 'OK';
+  const jdgMain = perfect ? (kps >= 7 ? 'PERFECT!!!' : 'PERFECT!') : speedName + '!';
+  const ek = rectCenter($('#enterKey'));
+  const card = rectCenter($('#qcard'));
+  pop(`${jdgMain}<small>${perfect ? speedName + ' · ' : ''}${kps.toFixed(1)} 打/秒</small>`, card.x, card.r.top + 10, 'jdg' + (perfect ? ' perfect' : ''));
+  pop('+' + fmt(bonus + 10 * MULTS[G.tier]), ek.x + 80, ek.y - 10, 'sc');
+
+  const big = perfect ? 1 : 0.6;
+  burst(ek.x, ek.y, { n: 50 * big + G.tier * 10, spd: 9 + G.tier, life: 55, size: 3.4, grav: 0.18 });
+  burst(card.x, card.y, { n: 24 * big, spd: 12, life: 40, shape: 'star', size: 2.4, grav: 0.02 });
+  ring(ek.x, ek.y, perfect ? '#ffd23f' : '#1de9ff', 220, 6);
+  if (perfect) ring(ek.x, ek.y, '#ff2e88', 320, 3);
+  flash(perfect ? '#ffd23f' : '#1de9ff', perfect ? 0.22 : 0.12, 220);
+  shake(perfect ? 7 : 4, 200);
+  kick = Math.min(kick + 1, 2.5);
+  Snd.enter(G.tier, perfect);
+  $('#enterKey').animate([{ transform: 'scale(.85)' }, { transform: 'scale(1)' }], { duration: 160 });
+  bump($('#hScore'), 1.12, 200);
+  if (MILESTONES.includes(G.combo)) milestone(G.combo);
+
+  if (G.mode === 'sprint' && G.words >= G.cfg.count) { updateHud(); finish('CLEAR!!'); return; }
+  G.state = 'play';
+  nextQuestion(false);
+  updateHud();
+}
+
+function elapsed() { return G.startT ? ((G.state === 'over' ? G.endT : now()) - G.startT) : 0; }
+
+function updateHud(force) {
+  if (!G) return;
+  const el = elapsed();
+  const min = el / 60000;
+  const kpm = min > 0.02 ? G.correct / min : 0;
+  const tot = G.correct + G.miss;
+  $('#hKpm').textContent = fmt(kpm);
+  $('#hMiss').textContent = G.miss;
+  $('#hAcc').textContent = (tot ? G.correct / tot * 100 : 100).toFixed(1);
+  $('#hWords').textContent = G.words;
+  $('#hMaxCombo').textContent = G.maxCombo;
+  $('#hCombo').textContent = G.combo;
+  $('#hComboWrap').className = 'combo' + (G.combo === 0 ? ' t0' : '');
+  const mult = $('#hMult');
+  mult.textContent = '×' + MULTS[G.tier].toFixed(1);
+  mult.className = 'mult t' + G.tier;
+}
+
+function updateTimer() {
+  const el = G.startT ? elapsed() : 0;
+  const t = $('#hTime'), bar = $('#hBar');
+  if (G.mode === 'time') {
+    const left = Math.max(0, G.cfg.limit * 1000 - el);
+    t.textContent = (left / 1000).toFixed(1);
+    bar.style.width = (left / (G.cfg.limit * 1000) * 100) + '%';
+    if (G.state !== 'countdown' && G.state !== 'over') {
+      if (left <= 10000) {
+        t.classList.add('warn');
+        if (!G.warned) { G.warned = true; banner('LAST 10s', 'ラストスパート！', 'red'); flash('#ff4057', 0.25, 400); }
+        const sec = Math.ceil(left / 1000);
+        if (sec !== G.lastTick) { G.lastTick = sec; Snd.tick(); }
+      }
+      if (left <= 0) finish('TIME UP!!');
+    }
+  } else if (G.mode === 'sprint') {
+    t.textContent = (el / 1000).toFixed(2);
+    bar.style.width = (G.words / G.cfg.count * 100) + '%';
+  } else {
+    t.textContent = fmtClock(el);
+    bar.style.width = ((el % 60000) / 60000 * 100) + '%';
+    if (G.state !== 'countdown' && G.state !== 'over' && el >= G.nextMinute) {
+      const w = windowStats(60000);
+      banner(`${fmtClock(G.nextMinute)} 経過`, `直近1分 ${fmt(w.kpm)} KPM / ミス ${w.miss}`, 'cyan');
+      Snd.select();
+      G.nextMinute += 60000;
+    }
+  }
+}
+
+/* ---------- エンドレス：区間集計 ---------- */
+function windowStats(ms) {
+  const t = G.state === 'over' ? G.endT : now();
+  const from = Math.max(G.startT, t - ms);
+  const spanMs = t - from;
+  let ok = 0, ng = 0;
+  for (let k = G.events.length - 1; k >= 0; k--) {
+    const e = G.events[k];
+    if (e.t < from) break;
+    e.ok ? ok++ : ng++;
+  }
+  const min = spanMs / 60000;
+  return { kpm: min > 0.01 ? ok / min : 0, ok, miss: ng, acc: ok + ng ? ok / (ok + ng) * 100 : 100, spanMs };
+}
+function resetStatsPanel() {
+  for (const id of ['K0', 'K3', 'K1', 'P0', 'P3', 'P1', 'M0', 'M3', 'M1', 'A0', 'A3', 'A1', 'S0', 'S3', 'S1']) $('#s' + id).textContent = '-';
+  $('#sBest1').textContent = '-';
+  drawChart();
+}
+function updateStatsPanel() {
+  if (!G.startT) return;
+  const el = elapsed();
+  const all = windowStats(Infinity), w3 = windowStats(180000), w1 = windowStats(60000);
+  const set = (id, v, cls) => { const e = $('#s' + id); e.textContent = v; e.className = (e.classList.contains('big') ? 'big ' : '') + (cls || ''); };
+  const cmp = (v) => v > all.kpm * 1.03 ? 'up' : v < all.kpm * 0.97 ? 'down' : '';
+  set('K0', fmt(all.kpm)); set('K3', fmt(w3.kpm), cmp(w3.kpm)); set('K1', fmt(w1.kpm), cmp(w1.kpm));
+  set('P0', (all.kpm / 60).toFixed(2)); set('P3', (w3.kpm / 60).toFixed(2)); set('P1', (w1.kpm / 60).toFixed(2));
+  set('M0', all.miss); set('M3', w3.miss); set('M1', w1.miss);
+  set('A0', all.acc.toFixed(1) + '%'); set('A3', w3.acc.toFixed(1) + '%'); set('A1', w1.acc.toFixed(1) + '%');
+  set('S0', fmtClock(all.spanMs)); set('S3', fmtClock(w3.spanMs)); set('S1', fmtClock(w1.spanMs));
+  if (el >= 60000 && w1.kpm > G.best1) G.best1 = w1.kpm;
+  $('#sBest1').textContent = el >= 60000 ? fmt(G.best1) + ' KPM' : '1分経過後に計測';
+  if (el - G.lastSample >= 2000) {
+    G.lastSample = el;
+    G.samples.push({ t: el, v: w1.kpm });
+    if (G.samples.length > 200) G.samples.shift();
+    drawChart();
+  }
+}
+function drawChart() {
+  const c = $('#chart'); if (!c) return;
+  const r = c.getBoundingClientRect(); if (!r.width) return;
+  const d = Math.min(2, window.devicePixelRatio || 1);
+  c.width = r.width * d; c.height = r.height * d;
+  const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
+  const w = r.width, h = r.height, padL = 30, padB = 14, padT = 8;
+  x.clearRect(0, 0, w, h);
+  const span = 180000;
+  const data = (G && G.samples) ? G.samples : [];
+  const tEnd = data.length ? data[data.length - 1].t : span;
+  const tStart = Math.max(0, tEnd - span);
+  const pts = data.filter(p => p.t >= tStart);
+  const maxV = Math.max(200, ...pts.map(p => p.v));
+  const top = Math.ceil(maxV / 100) * 100;
+  const X = t => padL + (t - tStart) / span * (w - padL - 6);
+  const Y = v => padT + (1 - v / top) * (h - padT - padB);
+  x.font = '10px "M PLUS 1 Code", monospace'; x.fillStyle = '#5f56a0'; x.strokeStyle = 'rgba(160,140,255,.14)'; x.lineWidth = 1;
+  for (let v = 0; v <= top; v += top / 4) {
+    x.beginPath(); x.moveTo(padL, Y(v)); x.lineTo(w - 6, Y(v)); x.stroke();
+    x.fillText(String(Math.round(v)), 2, Y(v) + 3);
+  }
+  x.fillText('-3:00', padL, h - 2); x.fillText('now', w - 26, h - 2);
+  if (pts.length < 2) return;
+  const grad = x.createLinearGradient(0, padT, 0, h - padB);
+  grad.addColorStop(0, 'rgba(255,46,136,.45)'); grad.addColorStop(1, 'rgba(255,46,136,0)');
+  x.beginPath(); x.moveTo(X(pts[0].t), Y(0));
+  pts.forEach(p => x.lineTo(X(p.t), Y(p.v)));
+  x.lineTo(X(pts[pts.length - 1].t), Y(0)); x.closePath(); x.fillStyle = grad; x.fill();
+  x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(X(p.t), Y(p.v)) : x.moveTo(X(p.t), Y(p.v)));
+  x.strokeStyle = '#ff2e88'; x.lineWidth = 2; x.stroke();
+  const last = pts[pts.length - 1];
+  x.fillStyle = '#ffd23f'; x.beginPath(); x.arc(X(last.t), Y(last.v), 3.5, 0, Math.PI * 2); x.fill();
+}
+
+/* ---------- 終了 / リザルト ---------- */
+function finish(word) {
+  if (G.state === 'over') return;
+  G.state = 'over';
+  G.endT = now();
+  clearTimeout(G._cd);
+  $('#countdown').innerHTML = '';
+  document.body.classList.remove('fever');
+  warpTarget = 0;
+  Snd.finish();
+  banner(word, '', word === 'TIME UP!!' ? 'red' : '');
+  flash('#ffffff', 0.5, 600);
+  confetti(160);
+  setTimeout(showResult, 1300);
+}
+
+const RANKS = [
+  [500, 'SSS', '打鍵の神'], [420, 'SS', '光速の指'], [350, 'S', 'エースタイピスト'],
+  [280, 'A', '上級タイピスト'], [200, 'B', '中級タイピスト'], [130, 'C', '見習いタイピスト'], [0, 'D', 'ひよっこ'],
+];
+function showResult() {
+  if (!G) return;
+  const el = G.endT - G.startT;
+  const min = el / 60000;
+  const kpm = min > 0 ? G.correct / min : 0;
+  const tot = G.correct + G.miss;
+  const acc = tot ? G.correct / tot * 100 : 100;
+  const eff = kpm * Math.pow(acc / 100, 2);
+  const rk = RANKS.find(r => eff >= r[0]);
+  const rankEl = $('#rRank');
+  rankEl.textContent = rk[1];
+  rankEl.className = 'rank' + (['C', 'D'].includes(rk[1]) ? ' r-low' : '');
+  $('#rRankName').textContent = rk[2];
+  $('#rMode').textContent = G.cfg.label;
+  $('#rTitle').textContent = G.mode === 'sprint' ? 'CLEAR!' : 'RESULT';
+
+  let prim, primLabel, better, bestText;
+  const key = 'best:' + G.id;
+  const prev = store.get(key, null);
+  if (G.mode === 'time') {
+    primLabel = 'SCORE'; prim = fmt(G.score);
+    better = prev == null || G.score > prev;
+    if (better) store.set(key, Math.round(G.score));
+    bestText = prev == null ? '初記録' : `自己ベスト ${fmt(Math.max(prev, G.score))}`;
+  } else if (G.mode === 'sprint') {
+    primLabel = 'CLEAR TIME'; prim = fmtSec(el);
+    better = prev == null || el < prev;
+    if (better) store.set(key, Math.round(el));
+    bestText = prev == null ? '初記録' : `自己ベスト ${fmtSec(Math.min(prev, el))}`;
+  } else {
+    primLabel = 'AVERAGE KPM'; prim = fmt(kpm);
+    const valid = el >= 60000;
+    better = valid && (prev == null || kpm > prev);
+    if (better) store.set(key, Math.round(kpm));
+    bestText = !valid ? '自己ベストは1分以上のプレイで記録' : prev == null ? '初記録' : `自己ベスト ${fmt(Math.max(prev, kpm))} KPM`;
+  }
+  $('#rPrimLabel').textContent = primLabel;
+  $('#rPrim').textContent = prim;
+  $('#rNew').hidden = !(better && prev != null);
+  $('#rBest').textContent = bestText;
+
+  const items = [];
+  if (G.mode !== 'time') items.push(['スコア', fmt(G.score)]);
+  if (G.mode !== 'sprint') items.push(['プレイ時間', G.mode === 'time' ? G.cfg.limit + 's' : fmtClock(el)]);
+  items.push(['KPM（打/分）', fmt(kpm)], ['打/秒', (kpm / 60).toFixed(2)], ['正確率', acc.toFixed(1) + '%'],
+    ['正打鍵', fmt(G.correct)], ['ミス', fmt(G.miss)], ['最大コンボ', fmt(G.maxCombo)], ['クリア数', G.words + '問'], ['PERFECT', G.perfects + '問']);
+  if (G.mode === 'endless') {
+    const w3 = windowStats(180000), w1 = windowStats(60000);
+    items.push(['直近3分 KPM', fmt(w3.kpm)], ['直近1分 KPM', fmt(w1.kpm)], ['最高 1分KPM', el >= 60000 ? fmt(G.best1) : '-']);
+  }
+  $('#rGrid').innerHTML = items.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  const weak = Object.entries(G.missKeys).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  $('#rWeak').innerHTML = weak.length ? '苦手キー：' + weak.map(([k, n]) => `<span class="kbd">${k === ' ' ? '␣' : k}</span>×${n}`).join(' ') : 'ノーミス！ 完璧。';
+
+  showScreen('result');
+  resultAt = now();
+  setTimeout(() => {
+    if (screen !== 'result') return;
+    const rr = rectCenter(rankEl);
+    burst(rr.x, rr.y, { n: 90, spd: 14, life: 70, size: 4, grav: 0.15 });
+    ring(rr.x, rr.y, '#ffd23f', 260, 8);
+    shake(16, 400);
+    Snd.kick(0, 0.8); Snd.noise(0.5, 0.1, 0, 2500);
+    if (['SSS', 'SS', 'S'].includes(rk[1]) || better) { confetti(220); Snd.milestone(); }
+    if (better && prev != null) setTimeout(() => banner('NEW RECORD!!', bestText), 400);
+  }, 600);
+  refreshBests();
+}
+
+function toTitle() {
+  if (G) { clearTimeout(G._cd); G.state = 'over'; }
+  G = null;
+  document.body.classList.remove('fever');
+  warpTarget = 0;
+  $('#countdown').innerHTML = '';
+  showScreen('title');
+  refreshBests();
+}
+
+function refreshBests() {
+  document.querySelectorAll('[data-best]').forEach(el => {
+    const id = el.dataset.best, v = store.get('best:' + id, null);
+    if (v == null) { el.textContent = ''; return; }
+    el.textContent = id.startsWith('time') ? 'BEST ' + fmt(v) : id.startsWith('sprint') ? 'BEST ' + fmtSec(v) : 'BEST ' + fmt(v) + ' KPM';
+  });
+}
+
+/* =========================================================
+   入力
+   ========================================================= */
+let imeTimer = 0;
+function imeWarn() {
+  const el = $('#ime'); el.hidden = false;
+  clearTimeout(imeTimer); imeTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+const TITLE_KEYS = { '1': 'time-60', '2': 'time-180', '3': 'sprint-10', '4': 'sprint-20', '5': 'sprint-30', '6': 'endless' };
+
+document.addEventListener('keydown', e => {
+  if (screen === 'title') {
+    if (TITLE_KEYS[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); Snd.init(); Snd.select(); startGame(TITLE_KEYS[e.key]); }
+    return;
+  }
+  if (screen === 'result') {
+    if (now() - resultAt < 800) { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); return; }
+    if (e.key === 'r' || e.key === 'R') { e.preventDefault(); startGame(lastMode); }
+    else if (e.key === 'Escape') { e.preventDefault(); toTitle(); }
+    else if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
+    return;
+  }
+  if (screen !== 'game' || !G) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (G.mode === 'endless' && G.startT && G.state !== 'over') finish('FINISH!!');
+    else if (G.state !== 'over') toTitle();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.isComposing || e.key === 'Process' || e.keyCode === 229) { e.preventDefault(); imeWarn(); return; }
+  if (['Enter', ' ', 'Backspace', 'Tab', "'", '/'].includes(e.key)) e.preventDefault();
+  if (G.state === 'countdown' || G.state === 'over') return;
+  if (e.repeat) return;
+  if (e.key === 'Enter') {
+    if (G.m.done()) completeWord(); else missKey('enterEarly');
+    return;
+  }
+  if (e.key.length !== 1 || e.key === ' ') return;
+  if (/[　-ヿ＀-￯]/.test(e.key)) { imeWarn(); return; }
+  const c = /[A-Z]/.test(e.key) ? e.key.toLowerCase() : e.key;
+  if (G.m.done()) { missKey('needEnter'); return; }
+  if (G.m.key(c)) hit(); else missKey('key');
+});
+
+document.querySelectorAll('.vbtn').forEach(b => b.addEventListener('click', () => { Snd.init(); Snd.select(); startGame(b.dataset.mode); }));
+$('#bRetry').addEventListener('click', () => startGame(lastMode));
+$('#bTitle').addEventListener('click', toTitle);
+
+function bindSeg(id, key, cast) {
+  const seg = $(id);
+  const sync = () => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(cast(b.dataset.v) === SET[key])));
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    SET[key] = cast(b.dataset.v); store.set(key, SET[key]); sync();
+    Snd.init(); Snd.select();
+  });
+  sync();
+}
+bindSeg('#segSound', 'sound', v => v === '1');
+bindSeg('#segFx', 'fx', v => Number(v));
+bindSeg('#segGuide', 'guide', v => v === '1');
+const vol = $('#vol');
+vol.value = SET.vol;
+vol.addEventListener('input', () => { SET.vol = Number(vol.value); store.set('vol', SET.vol); Snd.init(); Snd.setVol(SET.vol); });
+vol.addEventListener('change', () => Snd.select());
+
+/* =========================================================
+   メインループ
+   ========================================================= */
+let lastT = now();
+function frame(t) {
+  const dt = Math.min(50, t - lastT); lastT = t;
+  if (G && screen === 'game') {
+    updateTimer();
+    if (G.state !== 'countdown') {
+      if (t - G.lastStat > 200) { G.lastStat = t; updateHud(); if (G.mode === 'endless') updateStatsPanel(); }
+    }
+    G.disp += (G.score - G.disp) * Math.min(1, 0.18 * dt / 16.67);
+    if (Math.abs(G.score - G.disp) < 1) G.disp = G.score;
+    $('#hScore').textContent = fmt(G.disp);
+  }
+  drawBg(dt, t);
+  drawFx(dt);
+  requestAnimationFrame(frame);
+}
+
+function boot() {
+  resize();
+  refreshBests();
+  showScreen('title');
+  requestAnimationFrame(frame);
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot();
+
+// テスト用に公開（ブラウザ以外の検証で使用）
+window.__DOPA = { makeMatcher, QUESTIONS };
+</script>
+</body>
+</html>
