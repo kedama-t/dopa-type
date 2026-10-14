@@ -10,7 +10,7 @@
 
 ## 公開URL
 
-https://kedama-t.github.io/typing-training/
+https://kedama-t.github.io/dopa-type/
 
 ## お題の追加
 
