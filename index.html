@@ -334,6 +334,7 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
 
     <div class="settings">
       <span>サウンド<span class="seg" id="segSound"><button data-v="1">ON</button><button data-v="0">OFF</button></span></span>
+      <span>BGM<span class="seg" id="segBgm"><button data-v="1">ON</button><button data-v="0">OFF</button></span></span>
       <span><label for="vol">音量</label> <input type="range" id="vol" min="0" max="1" step="0.05"></span>
       <span>演出<span class="seg" id="segFx"><button data-v="2">MAX</button><button data-v="1">普通</button><button data-v="0">控えめ</button></span></span>
       <span>ガイド<span class="seg" id="segGuide"><button data-v="1">表示</button><button data-v="0">隠す</button></span></span>
@@ -1876,6 +1877,7 @@ const store = {
 const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SET = {
   sound: store.get('sound', true),
+  bgm: store.get('bgm', true),
   vol: store.get('vol', 0.6),
   fx: store.get('fx', reduceMotion ? 0 : 2),
   guide: store.get('guide', true),
@@ -1895,10 +1897,14 @@ const Snd = {
     if (!this.ctx) {
       try {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // master(音量) ← 効果音はコンプ経由 / BGM はエフェクトチェーン経由で別系統
         this.master = this.ctx.createGain();
+        this.master.connect(this.ctx.destination);
+        this.sfx = this.ctx.createGain();
         const comp = this.ctx.createDynamicsCompressor();
-        this.master.connect(comp).connect(this.ctx.destination);
+        this.sfx.connect(comp).connect(this.master);
         this.setVol(SET.vol);
+        Bgm.attach(this.ctx, this.master);
         const len = this.ctx.sampleRate;
         this.noiseBuf = this.ctx.createBuffer(1, len, len);
         const d = this.noiseBuf.getChannelData(0);
@@ -1918,7 +1924,7 @@ const Snd = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(this.master);
+    o.connect(g).connect(this.sfx);
     o.start(t); o.stop(t + dur + 0.03);
   },
   noise(dur, vol = 0.1, when = 0, freq = 2000, type = 'highpass') {
@@ -1928,7 +1934,7 @@ const Snd = {
     const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
     const g = c.createGain();
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(this.master);
+    src.connect(f).connect(g).connect(this.sfx);
     src.start(t); src.stop(t + dur + 0.02);
   },
   kick(when = 0, vol = 0.5) { this.tone(160, 0.22, 'sine', vol, when, 40); },
@@ -1971,6 +1977,211 @@ const Snd = {
     this.noise(0.9, 0.06, 0.3, 5000);
   },
   select() { this.tone(660, 0.06, 'square', 0.06); this.tone(990, 0.08, 'square', 0.05, 0.05); },
+};
+
+/* =========================================================
+   BGM（WebAudio）
+   コンボ段階が上がるほどリバーブ / ディレイ / オートフィルターが濃くなる。
+   ========================================================= */
+const BGM_BPM = 128;
+const BEAT = 60 / BGM_BPM;
+const BAR = BEAT * 4;
+const BGM_LOOP_SEC = 180;          // ループ長：ちょうど3分（128BPM × 96小節）
+const BGM_LOOP_KEEP_TAIL = true;   // true: 次の周回の頭に前周の余韻(180秒以降)を重ねる / false: 180秒で切る
+const BGM_LEVEL = 0.6;
+const BGM_FILES = { long: 'audio/dopatype', short: 'audio/dopatype_1min' };
+// コンボ段階(0〜5)ごとのエフェクト量
+//   rev/dly: センド量, lfo: 1小節あたりのローパス往復回数(0で固定), lpLo〜lpHi: スイープ幅(Hz), q: レゾナンス
+const BGM_FX = [
+  { rev: 0,    dly: 0,    lfo: 0, lpLo: 20000, lpHi: 20000, q: 0.7 }, // ×1.0
+  { rev: 0.16, dly: 0,    lfo: 0, lpLo: 20000, lpHi: 20000, q: 0.7 }, // ×1.5  30コンボ
+  { rev: 0.22, dly: 0.16, lfo: 0, lpLo: 20000, lpHi: 20000, q: 0.7 }, // ×2.0  60コンボ
+  { rev: 0.28, dly: 0.2,  lfo: 1, lpLo: 900,   lpHi: 16000, q: 5 },   // ×2.5  100コンボ FEVER
+  { rev: 0.34, dly: 0.24, lfo: 2, lpLo: 700,   lpHi: 17000, q: 7 },   // ×3.0  150コンボ
+  { rev: 0.4,  dly: 0.3,  lfo: 4, lpLo: 600,   lpHi: 18000, q: 9 },   // ×4.0  220コンボ
+];
+
+const Bgm = {
+  ctx: null, n: null, buffers: {}, loading: null,
+  srcs: [], timer: 0, gen: 0, cfg: null, startAt: 0, nextLoop: 0, lfoRate: 1,
+
+  // 再生フォーマット：Opus(.ogg) 優先、非対応ブラウザ（古い Safari 等）は AAC(.mp4)
+  exts() {
+    const a = document.createElement('audio');
+    return a.canPlayType && a.canPlayType('audio/ogg; codecs="opus"') ? ['ogg', 'mp4'] : ['mp4', 'ogg'];
+  },
+  // ユーザー操作前でもデコードできるよう OfflineAudioContext で読み込む
+  preload() {
+    if (this.loading) return this.loading;
+    const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Off || !window.fetch) return (this.loading = Promise.resolve());
+    const loadOne = async key => {
+      for (const ex of this.exts()) {
+        try {
+          const res = await fetch(BGM_FILES[key] + '.' + ex);
+          if (!res.ok) continue;
+          const ab = await res.arrayBuffer();
+          const off = new Off(2, 48000, 48000);
+          this.buffers[key] = await new Promise((ok, ng) => {
+            const pr = off.decodeAudioData(ab, ok, ng);
+            if (pr && pr.catch) pr.catch(ng);
+          });
+          return;
+        } catch (e) { /* 次の形式を試す */ }
+      }
+    };
+    this.loading = (async () => { await loadOne('long'); await loadOne('short'); })();
+    return this.loading;
+  },
+
+  attach(ctx, out) {
+    this.ctx = ctx;
+    const n = {};
+    const mk = (type, f, q) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+    n.input = ctx.createGain();
+    n.dip = mk('lowpass', 20000, 0.7);   // ミス時のこもり
+    n.hp = mk('highpass', 10, 0.7);      // マイルストーン時のライザー
+    n.lp = mk('lowpass', 20000, 0.7);    // コンボ段階のオートフィルター
+    n.lfoDepth = ctx.createGain(); n.lfoDepth.gain.value = 0;
+    n.lfoDepth.connect(n.lp.frequency);
+    n.dry = ctx.createGain();
+    n.revSend = ctx.createGain(); n.revSend.gain.value = 0;
+    n.rev = ctx.createConvolver(); n.rev.buffer = this.makeIR(ctx, 2.8);
+    // 付点8分のピンポンディレイ
+    n.dlySend = ctx.createGain(); n.dlySend.gain.value = 0;
+    n.dlySend.channelCount = 1; n.dlySend.channelCountMode = 'explicit';
+    n.dL = ctx.createDelay(2); n.dR = ctx.createDelay(2);
+    n.dL.delayTime.value = n.dR.delayTime.value = BEAT * 0.75;
+    n.fb = ctx.createGain(); n.fb.gain.value = 0.38;
+    n.dTone = mk('lowpass', 3800, 0.7);
+    const merge = ctx.createChannelMerger(2);
+    n.dlySend.connect(n.dL); n.dL.connect(n.dR); n.dR.connect(n.dTone).connect(n.fb).connect(n.dL);
+    n.dL.connect(merge, 0, 0); n.dR.connect(merge, 0, 1);
+    n.bus = ctx.createGain(); n.bus.gain.value = 0;
+    n.input.connect(n.dip).connect(n.hp).connect(n.lp);
+    n.lp.connect(n.dry).connect(n.bus);
+    n.lp.connect(n.revSend).connect(n.rev).connect(n.bus);
+    n.lp.connect(n.dlySend);
+    merge.connect(n.bus);
+    n.bus.connect(out);
+    this.n = n;
+    this.preload();
+  },
+  makeIR(ctx, sec) {
+    const sr = ctx.sampleRate, len = Math.floor(sr * sec), b = ctx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = i < sr * 0.018 ? 0 : (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.4) * 0.6;
+    }
+    return b;
+  },
+  ready() { return !!(this.ctx && this.n && SET.sound && SET.bgm); },
+  trackKey() { return this.cfg.mode === 'time' && this.cfg.limit === 60 ? 'short' : 'long'; },
+  looping() { return this.cfg.mode !== 'time'; },
+
+  // when: AudioContext 時刻。ここが曲頭＝計測開始
+  start(cfg, when) {
+    this.stop(0.05);
+    if (!this.ready()) return;
+    this.cfg = cfg; this.startAt = when;
+    const g = this.n.bus.gain;
+    g.setValueAtTime(BGM_LEVEL, when);
+    this.n.dip.frequency.cancelScheduledValues(0); this.n.dip.frequency.value = 20000;
+    this.n.hp.frequency.cancelScheduledValues(0); this.n.hp.frequency.value = 10;
+    this.restartLfo(when, 1);
+    this.applyTier(0, when, true);
+    this.play(this.gen);
+  },
+  play(gen) {
+    if (gen !== this.gen) return;
+    const buf = this.buffers[this.trackKey()];
+    if (!buf) { this.preload().then(() => { if (this.buffers[this.trackKey()]) this.play(gen); }); return; }
+    const t = Math.max(this.ctx.currentTime + 0.05, this.startAt);   // 読み込みが遅れたら途中から合流
+    const el = t - this.startAt;
+    if (!this.looping()) {
+      if (el < buf.duration) this.source(buf, t, el, 0);
+      return;
+    }
+    const k = Math.floor(el / BGM_LOOP_SEC);
+    const iterStart = this.startAt + k * BGM_LOOP_SEC;
+    this.source(buf, t, el - k * BGM_LOOP_SEC, BGM_LOOP_KEEP_TAIL ? 0 : iterStart + BGM_LOOP_SEC);
+    this.nextLoop = iterStart + BGM_LOOP_SEC;
+    clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      if (gen !== this.gen) { clearInterval(this.timer); return; }
+      while (this.nextLoop - this.ctx.currentTime < 2.5) {
+        this.source(buf, this.nextLoop, 0, BGM_LOOP_KEEP_TAIL ? 0 : this.nextLoop + BGM_LOOP_SEC);
+        this.nextLoop += BGM_LOOP_SEC;
+      }
+    }, 500);
+  },
+  source(buf, t, offset, stopAt) {
+    const s = this.ctx.createBufferSource();
+    s.buffer = buf; s.connect(this.n.input);
+    s.start(t, offset);
+    if (stopAt) s.stop(stopAt);
+    s.onended = () => { this.srcs = this.srcs.filter(x => x !== s); };
+    this.srcs.push(s);
+  },
+  stop(fade = 0.4) {
+    this.gen++;
+    clearInterval(this.timer);
+    if (!this.ctx || !this.n) return;
+    const t = this.ctx.currentTime, g = this.n.bus.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0, t + fade);
+    for (const s of this.srcs) { try { s.stop(t + fade + 0.05); } catch (e) { } }
+    this.srcs = [];
+  },
+  // タイムアタックは曲を最後(余韻込み)まで流しきる。それ以外はフェードアウト
+  finish(cfg) {
+    if (!this.ctx || !this.n) return;
+    if (cfg.mode === 'time') { this.gen++; clearInterval(this.timer); return; }
+    this.stop(2.5);
+  },
+
+  nextBar(t) { return this.startAt + Math.max(0, Math.ceil((t - this.startAt) / BAR - 1e-6)) * BAR; },
+  nextBeat(t) { return this.startAt + Math.max(0, Math.ceil((t - this.startAt) / BEAT - 1e-6)) * BEAT; },
+  restartLfo(t, perBar) {
+    const n = this.n;
+    if (n.lfo) { try { n.lfo.stop(t); } catch (e) { } }
+    n.lfo = this.ctx.createOscillator();
+    n.lfo.type = 'sine';
+    n.lfo.frequency.value = perBar / BAR;
+    n.lfo.connect(n.lfoDepth);
+    n.lfo.start(t);   // 小節頭で位相0 → 以後も小節線で位相がそろう
+    this.lfoRate = perBar;
+  },
+  setTier(t) { if (this.ready() && this.cfg) this.applyTier(t, this.ctx.currentTime, false); },
+  applyTier(t, at, instant) {
+    const p = BGM_FX[SET.fx === 0 ? 0 : t], n = this.n, tau = instant ? 0.005 : 0.35;
+    n.revSend.gain.setTargetAtTime(p.rev, at, tau);
+    n.dlySend.gain.setTargetAtTime(p.dly, at, tau);
+    n.dry.gain.setTargetAtTime(1 - p.rev * 0.6, at, tau);
+    n.lp.frequency.setTargetAtTime((p.lpLo + p.lpHi) / 2, at, tau);
+    n.lp.Q.setTargetAtTime(p.q, at, tau);
+    n.lfoDepth.gain.setTargetAtTime(p.lfo ? (p.lpHi - p.lpLo) / 2 : 0, at, tau);
+    if (p.lfo && p.lfo !== this.lfoRate) {
+      n.lfo.frequency.setValueAtTime(p.lfo / BAR, this.nextBar(at));
+      this.lfoRate = p.lfo;
+    }
+  },
+  // ミス：一瞬こもらせる（コンボ途切れは深く長く）
+  miss(big) {
+    if (!this.ready() || !this.cfg || SET.fx === 0) return;
+    const f = this.n.dip.frequency, t = this.ctx.currentTime;
+    f.cancelScheduledValues(t); f.setValueAtTime(big ? 260 : 1400, t);
+    f.exponentialRampToValueAtTime(20000, t + (big ? 1.6 : 0.35));
+  },
+  // マイルストーン：ハイパスで吸い上げて次の拍でドロップ
+  riser() {
+    if (!this.ready() || !this.cfg || SET.fx === 0) return;
+    const f = this.n.hp.frequency, t = this.ctx.currentTime;
+    let drop = this.nextBeat(t + 0.3);
+    if (drop - t > 0.8) drop = t + 0.5;
+    f.cancelScheduledValues(t); f.setValueAtTime(10, t);
+    f.exponentialRampToValueAtTime(1800, drop - 0.01);
+    f.setValueAtTime(10, drop);
+  },
 };
 
 /* =========================================================
@@ -2141,6 +2352,7 @@ function showScreen(id) {
 }
 
 function startGame(id) {
+  clearTimers();
   Snd.init();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   lastMode = id;
@@ -2169,25 +2381,32 @@ function startGame(id) {
   countdown();
 }
 
+// カウントダウンは BGM のテンポ(2拍間隔)に合わせ、GO! の瞬間に曲頭と計測開始をそろえる
 function countdown() {
   const host = $('#countdown');
   const seq = ['3', '2', '1', 'GO!'];
-  let i = 0;
-  const step = () => {
-    if (!G || G.state !== 'countdown') { host.innerHTML = ''; return; }
-    if (i >= seq.length) { host.innerHTML = ''; begin(); return; }
-    const v = seq[i];
-    host.innerHTML = `<span class="${v === 'GO!' ? 'go' : ''}">${v}</span>`;
-    if (v === 'GO!') { Snd.go(); flash('#ffd23f', 0.35, 400); ring(W / 2, H / 2, '#ffd23f', Math.max(W, H) * 0.6, 8); kick = 2; }
-    else Snd.count();
-    i++;
-    G._cd = setTimeout(step, v === 'GO!' ? 380 : 600);
-  };
-  step();
+  const step = BEAT * 2;
+  const lead = 0.15;
+  const goIn = lead + step * 3;
+  G._timers = [];
+  G._t0 = now() + goIn * 1000;
+  if (Snd.ctx) Bgm.start(G.cfg, Snd.ctx.currentTime + goIn);
+  seq.forEach((v, i) => {
+    G._timers.push(setTimeout(() => {
+      if (!G || G.state !== 'countdown') return;
+      host.innerHTML = `<span class="${v === 'GO!' ? 'go' : ''}">${v}</span>`;
+      if (v === 'GO!') {
+        begin();
+        Snd.go(); flash('#ffd23f', 0.35, 400); ring(W / 2, H / 2, '#ffd23f', Math.max(W, H) * 0.6, 8); kick = 2;
+        G._timers.push(setTimeout(() => { host.innerHTML = ''; }, 450));
+      } else Snd.count();
+    }, (lead + step * i) * 1000));
+  });
 }
+function clearTimers() { if (G && G._timers) G._timers.forEach(clearTimeout); }
 function begin() {
   G.state = G.m.done() ? 'enter' : 'play';
-  G.startT = now();
+  G.startT = G._t0;
   G.wordStart = G.startT;
 }
 
@@ -2263,6 +2482,7 @@ function missKey(kind) {
   logEvent(false);
   const exp = kind === 'needEnter' ? '⏎' : (G.m.guide().rest[0] || '⏎');
   G.missKeys[exp] = (G.missKeys[exp] || 0) + 1;
+  Bgm.miss(G.combo >= 20);
   if (G.combo >= 20) {
     Snd.breakCombo();
     const cc = rectCenter($('#hCombo'));
@@ -2288,6 +2508,7 @@ function setTier(t) {
   const up = t > G.tier;
   G.tier = t;
   warpTarget = t * 0.25;
+  Bgm.setTier(t);
   const fever = t >= 3;
   if (fever && !document.body.classList.contains('fever')) {
     banner('FEVER!!', 'スコア倍率アップ中 ― 指を止めるな', '');
@@ -2305,6 +2526,7 @@ function setTier(t) {
 
 function milestone(c) {
   Snd.milestone();
+  Bgm.riser();
   banner(`${c} COMBO!!`, c >= 300 ? '人間やめてる' : c >= 150 ? '止まらない、止められない' : 'いい流れ！', 'cyan');
   flash('#1de9ff', 0.35, 420);
   shake(14, 380);
@@ -2484,11 +2706,12 @@ function finish(word) {
   if (G.state === 'over') return;
   G.state = 'over';
   G.endT = now();
-  clearTimeout(G._cd);
+  clearTimers();
   $('#countdown').innerHTML = '';
   document.body.classList.remove('fever');
   warpTarget = 0;
   Snd.finish();
+  Bgm.finish(G.cfg);
   banner(word, '', word === 'TIME UP!!' ? 'red' : '');
   flash('#ffffff', 0.5, 600);
   confetti(160);
@@ -2569,7 +2792,8 @@ function showResult() {
 }
 
 function toTitle() {
-  if (G) { clearTimeout(G._cd); G.state = 'over'; }
+  if (G) { clearTimers(); G.state = 'over'; }
+  Bgm.stop(0.4);
   G = null;
   document.body.classList.remove('fever');
   warpTarget = 0;
@@ -2646,6 +2870,7 @@ function bindSeg(id, key, cast) {
   sync();
 }
 bindSeg('#segSound', 'sound', v => v === '1');
+bindSeg('#segBgm', 'bgm', v => v === '1');
 bindSeg('#segFx', 'fx', v => Number(v));
 bindSeg('#segGuide', 'guide', v => v === '1');
 const vol = $('#vol');
@@ -2675,6 +2900,7 @@ function frame(t) {
 
 function boot() {
   resize();
+  Bgm.preload();
   refreshBests();
   showScreen('title');
   requestAnimationFrame(frame);
@@ -2682,7 +2908,7 @@ function boot() {
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot();
 
 // テスト用に公開（ブラウザ以外の検証で使用）
-window.__DOPA = { makeMatcher, QUESTIONS };
+window.__DOPA = { makeMatcher, QUESTIONS, Bgm, Snd };
 </script>
 </body>
 </html>

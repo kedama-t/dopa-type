@@ -8,6 +8,17 @@
 
 ローマ字を打ち切ったら Enter で次のお題へ。IME は半角英数にしてプレイしてください。
 
+## BGM
+
+`audio/` の BGM を WebAudio API で再生します（Opus の `.ogg` 優先、非対応ブラウザは AAC の `.mp4`）。
+
+- タイムアタック 60秒 → `dopatype_1min`、180秒 → `dopatype` を余韻まで流しきり
+- スプリント / エンドレス → `dopatype` を 180秒（128BPM × 96小節）でループ
+- コンボ段階に応じてリバーブ・ピンポンディレイ・小節同期のオートフィルター（ローパス）が濃くなり、ミスでこもる／マイルストーンでハイパスのライザー
+- エフェクト量は `index.html` の `BGM_FX`、ループ時の余韻の扱いは `BGM_LOOP_KEEP_TAIL` で調整できます
+
+`fetch` で音声を読み込むため、`index.html` をファイルとして直接開いた場合（`file://`）は BGM が鳴りません。GitHub Pages 上か、`npx serve` などのローカルサーバー経由で開いてください。
+
 ## 公開URL
 
 https://kedama-t.github.io/dopa-type/
