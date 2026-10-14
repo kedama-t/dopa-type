@@ -1891,6 +1891,7 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 /* =========================================================
    サウンド（WebAudio で全部合成）
    ========================================================= */
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
 const Snd = {
   ctx: null, master: null, noiseBuf: null,
   init() {
@@ -1937,46 +1938,49 @@ const Snd = {
     src.connect(f).connect(g).connect(this.sfx);
     src.start(t); src.stop(t + dur + 0.02);
   },
-  kick(when = 0, vol = 0.5) { this.tone(160, 0.22, 'sine', vol, when, 40); },
+  // 効果音は BGM のキー F minor（A4=440Hz）に合わせる。音高は MIDI ノート番号で指定
+  kick(when = 0, vol = 0.5) { this.tone(midi(53), 0.22, 'sine', vol, when, midi(29)); },   // F3→F1 のピッチスイープ
   key(combo, tier) {
-    const pen = [0, 2, 4, 7, 9];
+    // F マイナーペンタ（C Eb F Ab Bb）を C5 から2オクターブ半かけて駆け上がる
+    const pen = [72, 75, 77, 80, 82];
     const idx = combo % 15;
-    const semi = pen[idx % 5] + 12 * Math.floor(idx / 5) + (tier >= 3 ? 2 : 0);
-    const f = 523.25 * Math.pow(2, semi / 12);
+    const f = midi(pen[idx % 5] + 12 * Math.floor(idx / 5));
     this.tone(f, 0.075, 'square', 0.05);
     this.tone(f * 2, 0.04, 'sine', 0.035);
-    if (tier >= 3) this.tone(f * 1.5, 0.08, 'triangle', 0.04);
+    if (tier >= 3) this.tone(f * 1.5, 0.08, 'triangle', 0.04);   // 完全5度上（全てFナチュラルマイナー内）
     this.noise(0.02, 0.03, 0, 6000);
   },
   miss() {
-    this.tone(180, 0.18, 'sawtooth', 0.09, 0, 70);
+    this.tone(midi(53), 0.18, 'sawtooth', 0.09, 0, midi(41));   // F3→F2
     this.noise(0.1, 0.06, 0, 400, 'lowpass');
   },
   breakCombo() {
-    [392, 311, 233, 175].forEach((f, i) => this.tone(f, 0.14, 'sawtooth', 0.06, i * 0.07));
+    [68, 65, 60, 53].forEach((n, i) => this.tone(midi(n), 0.14, 'sawtooth', 0.06, i * 0.07));   // Ab4 F4 C4 F3
   },
   enter(tier, perfect) {
     this.kick(0, 0.55);
     this.noise(0.12, 0.08, 0, 3000);
-    const root = 261.63 * Math.pow(2, Math.min(tier, 5) * 2 / 12);
-    [1, 1.26, 1.5, 2].forEach((m, i) => this.tone(root * m * 2, 0.16, 'triangle', 0.07, i * 0.035));
-    if (perfect) [3, 4, 5, 6].forEach((m, i) => this.tone(root * m * 2, 0.12, 'sine', 0.05, 0.14 + i * 0.04));
+    // コンボ段階で和音が進む：Fm → Ab → Bbm → Db → Eb → Fm(1oct上)
+    const chords = [[65, 68, 72, 77], [68, 72, 75, 80], [70, 73, 77, 82], [73, 77, 80, 85], [75, 79, 82, 87], [77, 80, 84, 89]];
+    const ch = chords[Math.min(tier, 5)];
+    ch.forEach((n, i) => this.tone(midi(n), 0.16, 'triangle', 0.07, i * 0.035));
+    if (perfect) ch.forEach((n, i) => this.tone(midi(n + 24), 0.12, 'sine', 0.045, 0.14 + i * 0.04));
   },
-  ready() { this.tone(1318, 0.09, 'sine', 0.07); this.tone(1760, 0.12, 'sine', 0.05, 0.05); },
+  ready() { this.tone(midi(89), 0.09, 'sine', 0.07); this.tone(midi(96), 0.12, 'sine', 0.05, 0.05); },   // F6, C7
   milestone() {
     this.kick(0, 0.6);
-    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(f, 0.18, 'square', 0.05, i * 0.05));
+    [77, 80, 84, 89, 92, 96].forEach((n, i) => this.tone(midi(n), 0.18, 'square', 0.05, i * 0.05));   // F Ab C の分散和音
     this.noise(0.6, 0.06, 0.05, 5000);
   },
-  count() { this.tone(880, 0.12, 'square', 0.08); this.kick(0, 0.35); },
-  go() { this.kick(0, 0.7); [523, 784, 1047].forEach((f, i) => this.tone(f, 0.35, 'sawtooth', 0.05, i * 0.02)); this.noise(0.4, 0.08, 0, 4000); },
-  tick() { this.tone(1600, 0.04, 'square', 0.05); },
+  count() { this.tone(midi(84), 0.12, 'square', 0.08); this.kick(0, 0.35); },   // C6
+  go() { this.kick(0, 0.7); [65, 68, 72, 77].forEach((n, i) => this.tone(midi(n), 0.35, 'sawtooth', 0.05, i * 0.02)); this.noise(0.4, 0.08, 0, 4000); },   // Fm
+  tick() { this.tone(midi(96), 0.04, 'square', 0.05); },   // C7
   finish() {
     this.kick(0, 0.7); this.kick(0.25, 0.6);
-    [[523, 0], [659, .1], [784, .2], [1047, .3], [784, .45], [1047, .55], [1319, .7]].forEach(([f, w]) => this.tone(f, 0.3, 'square', 0.05, w));
+    [[77, 0], [80, .1], [84, .2], [87, .3], [84, .45], [87, .55], [89, .7]].forEach(([n, w]) => this.tone(midi(n), 0.3, 'square', 0.05, w));   // F Ab C Eb C Eb F
     this.noise(0.9, 0.06, 0.3, 5000);
   },
-  select() { this.tone(660, 0.06, 'square', 0.06); this.tone(990, 0.08, 'square', 0.05, 0.05); },
+  select() { this.tone(midi(84), 0.06, 'square', 0.06); this.tone(midi(89), 0.08, 'square', 0.05, 0.05); },   // C6 → F6
 };
 
 /* =========================================================
@@ -1988,7 +1992,7 @@ const BEAT = 60 / BGM_BPM;
 const BAR = BEAT * 4;
 const BGM_LOOP_SEC = 180;          // ループ長：ちょうど3分（128BPM × 96小節）
 const BGM_LOOP_KEEP_TAIL = true;   // true: 次の周回の頭に前周の余韻(180秒以降)を重ねる / false: 180秒で切る
-const BGM_LEVEL = 0.6;
+const BGM_LEVEL = 0.5;
 const BGM_FILES = { long: 'audio/dopatype', short: 'audio/dopatype_1min' };
 // コンボ段階(0〜5)ごとのエフェクト量
 //   rev/dly: センド量, lfo: 1小節あたりのローパス往復回数(0で固定), lpLo〜lpHi: スイープ幅(Hz), q: レゾナンス
