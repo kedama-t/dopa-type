@@ -2005,10 +2005,10 @@ const Bgm = {
   ctx: null, n: null, buffers: {}, loading: null,
   srcs: [], timer: 0, gen: 0, cfg: null, startAt: 0, nextLoop: 0, lfoRate: 1,
 
-  // 再生フォーマット：Opus 優先、非対応ブラウザ（古い Safari 等）は AAC
+  // 再生フォーマット：Opus(.ogg) 優先、非対応ブラウザ（古い Safari 等）は AAC(.mp4)
   exts() {
     const a = document.createElement('audio');
-    return a.canPlayType && a.canPlayType('audio/ogg; codecs="opus"') ? ['opus', 'm4a'] : ['m4a', 'opus'];
+    return a.canPlayType && a.canPlayType('audio/ogg; codecs="opus"') ? ['ogg', 'mp4'] : ['mp4', 'ogg'];
   },
   // ユーザー操作前でもデコードできるよう OfflineAudioContext で読み込む
   preload() {

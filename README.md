@@ -10,7 +10,7 @@
 
 ## BGM
 
-`audio/` の BGM を WebAudio API で再生します（Opus 優先、非対応ブラウザは AAC）。
+`audio/` の BGM を WebAudio API で再生します（Opus の `.ogg` 優先、非対応ブラウザは AAC の `.mp4`）。
 
 - タイムアタック 60秒 → `dopatype_1min`、180秒 → `dopatype` を余韻まで流しきり
 - スプリント / エンドレス → `dopatype` を 180秒（128BPM × 96小節）でループ
