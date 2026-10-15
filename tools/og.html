@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@800&family=Rubik+Mono+One&display=swap">
+<style>
+  html, body { margin: 0; }
+  body { width: 1200px; height: 630px; overflow: hidden; position: relative; color: #f5f1ff;
+    background: radial-gradient(120% 80% at 50% 115%, #3a0f6e 0%, transparent 60%), radial-gradient(80% 60% at 50% -15%, #12206e 0%, transparent 70%), #0a0628; }
+  canvas { position: absolute; inset: 0; }
+  .frame { position: absolute; inset: 18px; border-radius: 26px; padding: 4px;
+    background: linear-gradient(135deg, #ff2e88, #ffd23f 50%, #1de9ff);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  .logo { font-family: 'Rubik Mono One', sans-serif; font-size: 150px; line-height: .92; text-align: center; margin: 0;
+    text-shadow: 7px 0 #ff2e88, -7px 0 #1de9ff, 0 0 60px rgba(255,46,136,.6); transform: rotate(-3deg); }
+  .logo span { color: #ffd23f; }
+  .tag { font-family: 'Dela Gothic One', sans-serif; font-size: 46px; margin: 8px 0 0;
+    background: linear-gradient(90deg, #ff2e88, #ffd23f, #1de9ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: 800; font-size: 24px; color: #a39bd8; margin: 0; }
+</style></head>
+<body>
+<canvas id="c" width="1200" height="630"></canvas>
+<div class="frame"></div>
+<div class="wrap">
+  <h1 class="logo">DOPA<br><span>TYPE</span></h1>
+  <p class="tag">打て。光れ。脳汁を出せ。</p>
+  <p class="sub">日本語ローマ字タイピング ― タイムアタック / スプリント / エンドレス</p>
+</div>
+<script>
+  const x = document.getElementById('c').getContext('2d');
+  let seed = 11; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  x.lineCap = 'round';
+  for (let i = 0; i < 220; i++) {
+    const a = r() * Math.PI * 2, r1 = 220 + r() * 520, r2 = r1 + 30 + r() * 140;
+    x.strokeStyle = r() < .5 ? `rgba(29,233,255,${.12 + r() * .35})` : `rgba(255,120,200,${.12 + r() * .3})`;
+    x.lineWidth = 1 + r() * 2.4;
+    x.beginPath(); x.moveTo(600 + Math.cos(a) * r1, 300 + Math.sin(a) * r1 * .7); x.lineTo(600 + Math.cos(a) * r2, 300 + Math.sin(a) * r2 * .7); x.stroke();
+  }
+</script>
+</body></html>
