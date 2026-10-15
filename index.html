@@ -4,6 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DOPA TYPE</title>
+<meta name="description" content="打て。光れ。脳汁を出せ。派手な演出で遊ぶ日本語ローマ字タイピング。タイムアタック・スプリント・エンドレスの3モード。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DOPA TYPE">
+<meta property="og:title" content="DOPA TYPE">
+<meta property="og:description" content="打て。光れ。脳汁を出せ。派手な演出で遊ぶ日本語ローマ字タイピング。">
+<meta property="og:url" content="https://kedama-t.github.io/dopa-type/">
+<meta property="og:image" content="https://kedama-t.github.io/dopa-type/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="DOPA TYPE ― 打て。光れ。脳汁を出せ。">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0628">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+1+Code:wght@500;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Rubik+Mono+One&display=swap">
@@ -278,6 +294,14 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
 .btn.primary { background: var(--hot); border-color: var(--hot); color: #fff; box-shadow: 0 10px 34px -8px var(--hot); }
 .btn .kbd { margin-right: 6px; font-size: 12px; }
 
+.ver { font-family: var(--f-code); font-size: 12px; color: var(--dim); margin: 0; text-align: center; }
+.modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(5, 2, 20, .78); backdrop-filter: blur(4px); }
+.sheet { width: min(760px, 100%); max-height: calc(100% - 8px); overflow: auto; display: flex; flex-direction: column; gap: 14px;
+  padding: 20px; border-radius: 20px; background: linear-gradient(160deg, rgba(40, 22, 110, .97), rgba(18, 10, 58, .98)); border: 1px solid var(--line); }
+.sheet h3 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: 22px; }
+.sheet img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); aspect-ratio: 16 / 9; }
+.share-note { margin: 0; font-size: 13px; line-height: 1.7; color: var(--mute); min-height: 1.7em; }
+.share-note.ok { color: var(--good); } .share-note.ng { color: var(--miss); }
 @media (max-width: 900px) {
   .modes { grid-template-columns: minmax(0, 1fr); }
   #game.endless .play { grid-template-columns: minmax(0, 1fr); }
@@ -340,6 +364,7 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
       <span>ガイド<span class="seg" id="segGuide"><button data-v="1">表示</button><button data-v="0">隠す</button></span></span>
     </div>
     <p class="howto">ミスで<b>コンボ</b>が途切れる。30コンボごとに<b>スコア倍率</b>が上がり、100コンボで<b>FEVER</b>突入。ノーミスで Enter を叩くと PERFECT ボーナス。<br>「し = si / shi」「ん = n / nn」「っ = 子音重ね / xtu」など主要な入力ゆれに対応。</p>
+    <p class="ver" id="ver"></p>
   </section>
 
   <!-- GAME -->
@@ -418,11 +443,24 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
     <div class="weak" id="rWeak"></div>
     <div class="res-actions">
       <button class="btn primary" id="bRetry"><span class="kbd">R</span>もう一回</button>
+      <button class="btn" id="bShare"><span class="kbd">S</span>結果をシェア</button>
       <button class="btn" id="bTitle"><span class="kbd">Esc</span>タイトルへ</button>
     </div>
   </section>
 </div>
 
+<div class="modal" id="shareModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <h3 id="shareTitle">結果をシェア</h3>
+    <img id="shareImg" alt="シェア用の結果画像">
+    <p class="share-note" id="shareNote"></p>
+    <div class="res-actions">
+      <button class="btn primary" id="bShareX">X でシェア</button>
+      <button class="btn" id="bShareSave">画像を保存</button>
+      <button class="btn" id="bShareClose"><span class="kbd">Esc</span>閉じる</button>
+    </div>
+  </div>
+</div>
 <div id="countdown"></div>
 <div id="banner"></div>
 <div id="popLayer"></div>
@@ -431,6 +469,10 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
 
 <script>
 'use strict';
+/* バージョン：お題や機能を追加したら MINOR、修正は PATCH を上げる（README の更新履歴も追記） */
+const APP_VERSION = '1.1.0';
+const SITE_URL = 'https://kedama-t.github.io/dopa-type/';
+const HASHTAG = 'DOPATYPE';
 /* =========================================================
    お題データ  [表示, 読み(ひらがな)]
    ========================================================= */
@@ -2357,6 +2399,7 @@ function showScreen(id) {
 
 function startGame(id) {
   clearTimers();
+  $('#shareModal').hidden = true;
   Snd.init();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   lastMode = id;
@@ -2780,6 +2823,15 @@ function showResult() {
   const weak = Object.entries(G.missKeys).sort((a, b) => b[1] - a[1]).slice(0, 5);
   $('#rWeak').innerHTML = weak.length ? '苦手キー：' + weak.map(([k, n]) => `<span class="kbd">${k === ' ' ? '␣' : k}</span>×${n}`).join(' ') : 'ノーミス！ 完璧。';
 
+  const shareStats = G.mode === 'endless'
+    ? [['直近1分 KPM', fmt(windowStats(60000).kpm)], ['最高 1分KPM', el >= 60000 ? fmt(G.best1) : '-'], ['正確率', acc.toFixed(1) + '%'], ['プレイ時間', fmtClock(el)]]
+    : [['KPM', fmt(kpm)], ['正確率', acc.toFixed(1) + '%'], ['最大コンボ', fmt(G.maxCombo)], G.mode === 'time' ? ['クリア数', G.words + '問'] : ['ミス', fmt(G.miss)]];
+  lastShare = {
+    mode: G.mode, modeJa: MODE_JA[G.id], label: G.cfg.label, rank: rk[1], rankName: rk[2],
+    primLabel, prim, kpm: fmt(kpm), acc: acc.toFixed(1), stats: shareStats, at: new Date(),
+  };
+  shareBlob = null;
+
   showScreen('result');
   resultAt = now();
   setTimeout(() => {
@@ -2795,8 +2847,169 @@ function showResult() {
   refreshBests();
 }
 
+
+/* ---------- 結果シェア（画像はブラウザ内で生成。サーバー不要） ---------- */
+const MODE_JA = {
+  'time-60': 'タイムアタック60秒', 'time-180': 'タイムアタック180秒',
+  'sprint-10': 'スプリント10問', 'sprint-20': 'スプリント20問', 'sprint-30': 'スプリント30問', 'endless': 'エンドレス',
+};
+let lastShare = null, shareBlob = null, shareUrl = '';
+const fileShareOK = () => {
+  try { return !!(navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x.png', { type: 'image/png' })] })); } catch (e) { return false; }
+};
+
+function shareText(r) {
+  const head = r.mode === 'sprint' ? `${r.modeJa}を ${r.prim} でクリア！` : `${r.modeJa}で ${r.rank} ランク！`;
+  const body = r.mode === 'time' ? `スコア ${r.prim} / ${r.kpm} KPM / 正確率 ${r.acc}%`
+    : r.mode === 'sprint' ? `${r.rank} ランク / ${r.kpm} KPM / 正確率 ${r.acc}%`
+    : `平均 ${r.prim} KPM / 正確率 ${r.acc}%`;
+  return `DOPA TYPE ${head}\n${body}`;
+}
+
+async function renderShareImage(r) {
+  try {
+    await Promise.all(['400 200px "Rubik Mono One"', '400 40px "Dela Gothic One"', '700 30px "M PLUS 1 Code"', '800 24px "M PLUS Rounded 1c"'].map(f => document.fonts.load(f, 'DOPATYPE打鍵0123456789')));
+  } catch (e) { }
+  const W = 1200, H = 675;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const F = { num: '"Rubik Mono One", "Arial Black", sans-serif', disp: '"Dela Gothic One", "Hiragino Sans", sans-serif', code: '"M PLUS 1 Code", ui-monospace, monospace', body: '"M PLUS Rounded 1c", "Hiragino Sans", sans-serif' };
+  const rr = (X, Y, w, h, rad) => { x.beginPath(); x.moveTo(X + rad, Y); x.arcTo(X + w, Y, X + w, Y + h, rad); x.arcTo(X + w, Y + h, X, Y + h, rad); x.arcTo(X, Y + h, X, Y, rad); x.arcTo(X, Y, X + w, Y, rad); x.closePath(); };
+  const fit = (text, font, size, maxW) => { x.font = `${size}px ${font}`; while (x.measureText(text).width > maxW && size > 10) { size -= 2; x.font = `${size}px ${font}`; } return size; };
+  const neon = (text, X, Y, off, color, glow) => {
+    x.fillStyle = '#ff2e88'; x.fillText(text, X + off, Y);
+    x.fillStyle = '#1de9ff'; x.fillText(text, X - off, Y);
+    x.save(); x.shadowColor = glow || color; x.shadowBlur = 30; x.fillStyle = color; x.fillText(text, X, Y); x.restore();
+  };
+
+  // 背景
+  x.fillStyle = '#0a0628'; x.fillRect(0, 0, W, H);
+  let g = x.createRadialGradient(W * 0.5, H * 1.2, 0, W * 0.5, H * 1.2, W * 0.75);
+  g.addColorStop(0, '#3a0f6e'); g.addColorStop(1, 'rgba(58,15,110,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  g = x.createRadialGradient(W * 0.5, -H * 0.2, 0, W * 0.5, -H * 0.2, W * 0.6);
+  g.addColorStop(0, '#12206e'); g.addColorStop(1, 'rgba(18,32,110,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // スピードライン（ランクから放射）
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const cx = 300, cy = 360;
+  x.lineCap = 'round';
+  for (let i = 0; i < 140; i++) {
+    const a = rnd() * Math.PI * 2, r1 = 140 + rnd() * 500, r2 = r1 + 30 + rnd() * 120;
+    x.strokeStyle = rnd() < 0.5 ? `rgba(29,233,255,${0.15 + rnd() * 0.35})` : `rgba(255,120,200,${0.15 + rnd() * 0.3})`;
+    x.lineWidth = 1 + rnd() * 2.2;
+    x.beginPath(); x.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); x.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); x.stroke();
+  }
+  // 枠
+  g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#ff2e88'); g.addColorStop(0.5, '#ffd23f'); g.addColorStop(1, '#1de9ff');
+  x.strokeStyle = g; x.lineWidth = 4; rr(18, 18, W - 36, H - 36, 26); x.stroke();
+
+  // ロゴ / モード
+  x.textBaseline = 'alphabetic'; x.textAlign = 'left';
+  x.font = `30px ${F.num}`; neon('DOPA TYPE', 54, 84, 2, '#f5f1ff', '#ff2e88');
+  x.textAlign = 'right'; x.font = `16px ${F.num}`; x.fillStyle = '#1de9ff'; x.fillText(r.label, W - 54, 62);
+  x.font = `22px ${F.disp}`; x.fillStyle = '#f5f1ff'; x.fillText(r.modeJa, W - 54, 94);
+
+  // ランク
+  x.textAlign = 'center';
+  const rs = fit(r.rank, F.num, 220, 440);
+  x.save(); x.translate(cx, cy + rs * 0.36); x.rotate(-0.12);
+  const low = r.rank === 'C' || r.rank === 'D';
+  neon(r.rank, 0, 0, 7, low ? '#a39bd8' : '#ffd23f', low ? '#5f56a0' : '#ffd23f');
+  x.restore();
+  x.font = `30px ${F.disp}`; x.fillStyle = '#f5f1ff'; x.fillText(r.rankName, cx, 560);
+
+  // メイン数値
+  const px = 610, pw = W - 54 - px;
+  x.textAlign = 'left';
+  x.font = `16px ${F.num}`; x.fillStyle = '#a39bd8'; x.fillText(r.primLabel.split('').join(' '), px, 196);
+  // スプリントは「5.86s」を数値＋小さな単位に分けて描く
+  const unit = r.mode === 'sprint' ? 'SEC' : '';
+  const pv = unit ? r.prim.replace(/s$/, '') : r.prim;
+  x.font = `28px ${F.num}`; const uw = unit ? x.measureText(unit).width + 14 : 0;
+  const ps = fit(pv, F.num, 96, pw - uw);
+  g = x.createLinearGradient(0, 210, 0, 210 + ps); g.addColorStop(0.3, '#ffffff'); g.addColorStop(1, '#1de9ff');
+  x.save(); x.shadowColor = 'rgba(29,233,255,.6)'; x.shadowBlur = 24; x.fillStyle = g; x.fillText(pv, px, 206 + ps); x.restore();
+  if (unit) { const vw = x.measureText(pv).width; x.font = `28px ${F.num}`; x.fillStyle = '#1de9ff'; x.fillText(unit, px + vw + 14, 206 + ps); }
+
+  // サブ指標 2×2
+  const top = 350, cw = (pw - 16) / 2, ch = 96;
+  r.stats.forEach(([k, v], i) => {
+    const X = px + (i % 2) * (cw + 16), Y = top + Math.floor(i / 2) * (ch + 14);
+    x.fillStyle = 'rgba(28,16,84,.78)'; rr(X, Y, cw, ch, 16); x.fill();
+    x.strokeStyle = 'rgba(160,140,255,.3)'; x.lineWidth = 1.5; x.stroke();
+    x.font = `800 17px ${F.body}`; x.fillStyle = '#a39bd8'; x.fillText(k, X + 18, Y + 32);
+    const vs = fit(String(v), F.code, 36, cw - 36); x.font = `700 ${vs}px ${F.code}`;
+    x.fillStyle = '#f5f1ff'; x.fillText(String(v), X + 18, Y + 76);
+  });
+
+  // フッター：URL / 日付 / バージョン
+  const d = r.at, ds = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  x.font = `500 16px ${F.code}`; x.fillStyle = '#a39bd8'; x.textAlign = 'left';
+  x.fillText(SITE_URL.replace(/^https:\/\//, ''), 54, H - 44);
+  x.textAlign = 'right'; x.fillStyle = '#5f56a0';
+  x.fillText(`${ds}  ·  v${APP_VERSION}`, W - 54, H - 44);
+
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+
+function setShareNote(msg, cls = '') { const n = $('#shareNote'); n.textContent = msg; n.className = 'share-note ' + cls; }
+
+async function openShare() {
+  if (!lastShare) return;
+  $('#shareModal').hidden = false;
+  setShareNote('画像を作っています…');
+  if (!shareBlob) {
+    shareBlob = await renderShareImage(lastShare);
+    if (shareUrl) URL.revokeObjectURL(shareUrl);
+    shareUrl = URL.createObjectURL(shareBlob);
+  }
+  $('#shareImg').src = shareUrl;
+  setShareNote(fileShareOK()
+    ? '「X でシェア」で共有メニューが開きます。X を選ぶと画像付きで投稿できます。'
+    : '「X でシェア」で画像をコピーして投稿画面を開きます。投稿欄に貼り付け（Ctrl+V / ⌘V）てください。');
+  $('#bShareX').focus();
+}
+function closeShare() { $('#shareModal').hidden = true; $('#bShare').focus(); }
+const shareOpen = () => !$('#shareModal').hidden;
+
+function intentUrl(text) {
+  return 'https://twitter.com/intent/tweet?' + new URLSearchParams({ text, url: SITE_URL, hashtags: HASHTAG }).toString();
+}
+function saveImage() {
+  if (!shareBlob) return false;
+  const a = document.createElement('a');
+  a.href = shareUrl; a.download = `dopatype-${lastShare.mode}-${Date.now()}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function shareToX() {
+  if (!shareBlob || !lastShare) return;
+  const text = shareText(lastShare);
+  // ① 共有シート（スマホ・一部PC）：画像と本文をそのまま X アプリへ
+  if (fileShareOK()) {
+    const file = new File([shareBlob], 'dopatype-result.png', { type: 'image/png' });
+    navigator.share({ files: [file], text: `${text}\n#${HASHTAG}\n${SITE_URL}` })
+      .then(() => setShareNote('共有しました。', 'ok'))
+      .catch(e => { if (e && e.name !== 'AbortError') setShareNote('共有できませんでした。「画像を保存」から添付してください。', 'ng'); });
+    return;
+  }
+  // ② クリップボードに画像をコピーしてから投稿画面を開く（同じクリック内で両方を呼ぶ）
+  let copying = null;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) copying = navigator.clipboard.write([new ClipboardItem({ 'image/png': shareBlob })]);
+  } catch (e) { copying = null; }
+  window.open(intentUrl(text), '_blank', 'noopener');
+  if (copying) {
+    copying.then(() => setShareNote('画像をコピーしました。X の投稿欄に貼り付け（Ctrl+V / ⌘V）てください。', 'ok'))
+      .catch(() => { saveImage(); setShareNote('画像を保存しました。X の投稿に添付してください。', 'ok'); });
+  } else {
+    saveImage();
+    setShareNote('画像を保存しました。X の投稿に添付してください。', 'ok');
+  }
+}
+
 function toTitle() {
   if (G) { clearTimers(); G.state = 'over'; }
+  $('#shareModal').hidden = true;
   Bgm.stop(0.4);
   G = null;
   document.body.classList.remove('fever');
@@ -2829,9 +3042,14 @@ document.addEventListener('keydown', e => {
     if (TITLE_KEYS[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); Snd.init(); Snd.select(); startGame(TITLE_KEYS[e.key]); }
     return;
   }
+  if (screen === 'result' && shareOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); closeShare(); }
+    return;
+  }
   if (screen === 'result') {
     if (now() - resultAt < 800) { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); startGame(lastMode); }
+    else if (e.key === 's' || e.key === 'S') { e.preventDefault(); openShare(); }
     else if (e.key === 'Escape') { e.preventDefault(); toTitle(); }
     else if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
     return;
@@ -2862,6 +3080,11 @@ document.addEventListener('keydown', e => {
 document.querySelectorAll('.vbtn').forEach(b => b.addEventListener('click', () => { Snd.init(); Snd.select(); startGame(b.dataset.mode); }));
 $('#bRetry').addEventListener('click', () => startGame(lastMode));
 $('#bTitle').addEventListener('click', toTitle);
+$('#bShare').addEventListener('click', openShare);
+$('#bShareX').addEventListener('click', shareToX);
+$('#bShareSave').addEventListener('click', () => { if (saveImage()) setShareNote('画像を保存しました。', 'ok'); });
+$('#bShareClose').addEventListener('click', closeShare);
+$('#shareModal').addEventListener('click', e => { if (e.target.id === 'shareModal') closeShare(); });
 
 function bindSeg(id, key, cast) {
   const seg = $(id);
@@ -2903,6 +3126,7 @@ function frame(t) {
 }
 
 function boot() {
+  $('#ver').textContent = `v${APP_VERSION} · お題 ${QUESTIONS.length.toLocaleString('ja-JP')}問`;
   resize();
   Bgm.preload();
   refreshBests();
@@ -2912,7 +3136,7 @@ function boot() {
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot();
 
 // テスト用に公開（ブラウザ以外の検証で使用）
-window.__DOPA = { makeMatcher, QUESTIONS, Bgm, Snd };
+window.__DOPA = { makeMatcher, QUESTIONS, Bgm, Snd, renderShareImage, shareText };
 </script>
 </body>
 </html>
