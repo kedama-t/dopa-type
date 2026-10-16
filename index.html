@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DOPA TYPE</title>
-<meta name="description" content="打て。光れ。脳汁を出せ。派手な演出で遊ぶ日本語ローマ字タイピング。タイムアタック・スプリント・エンドレスの3モード。">
+<meta name="description" content="打て。光れ。脳汁を出せ。派手な演出で遊ぶ日本語ローマ字タイピング。スプリント・タイムアタック・エンドレスの3モード。">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DOPA TYPE">
 <meta property="og:title" content="DOPA TYPE">
@@ -119,8 +119,8 @@ body.fever::before {
 .mode::after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none;
   background: linear-gradient(135deg, var(--c1), transparent 40%, transparent 60%, var(--c2)); opacity: .55;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 2px; }
-.mode.m-time { --c1: var(--hot); --c2: var(--gold); }
-.mode.m-sprint { --c1: var(--cyan); --c2: var(--good); }
+.mode.m-timed { --c1: var(--hot); --c2: var(--gold); }
+.mode.m-count { --c1: var(--cyan); --c2: var(--good); }
 .mode.m-endless { --c1: #8a5cff; --c2: var(--hot); }
 .mode h2 { font-family: var(--f-display); font-weight: 400; font-size: 26px; margin: 0; line-height: 1.1; }
 .mode h2 small { display: block; font-family: var(--f-num); font-size: 12px; letter-spacing: .12em; color: var(--c1); margin-bottom: 6px; }
@@ -330,21 +330,21 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
     <p class="subline">ローマ字で打ち切ったら <kbd>Enter</kbd> で次のお題へ。IME は <b>半角英数</b> にしてプレイ。</p>
 
     <div class="modes">
-      <div class="mode m-time">
-        <h2><small>TIME ATTACK</small>タイムアタック</h2>
+      <div class="mode m-timed">
+        <h2><small>SPRINT</small>スプリント</h2>
         <p>制限時間内に何問・何打鍵いけるか。スコアはコンボ倍率で跳ね上がる。</p>
         <div class="vbtns">
-          <button class="vbtn" data-mode="time-60"><b>60秒</b><span class="best" data-best="time-60"></span><span class="k">[1]</span></button>
-          <button class="vbtn" data-mode="time-180"><b>180秒</b><span class="best" data-best="time-180"></span><span class="k">[2]</span></button>
+          <button class="vbtn" data-mode="timed-60"><b>60秒</b><span class="best" data-best="timed-60"></span><span class="k">[1]</span></button>
+          <button class="vbtn" data-mode="timed-180"><b>180秒</b><span class="best" data-best="timed-180"></span><span class="k">[2]</span></button>
         </div>
       </div>
-      <div class="mode m-sprint">
-        <h2><small>SPRINT</small>スプリント</h2>
+      <div class="mode m-count">
+        <h2><small>TIME ATTACK</small>タイムアタック</h2>
         <p>決まった問題数を打ち切るまでのタイムを競う。最後の Enter でタイマー停止。</p>
         <div class="vbtns">
-          <button class="vbtn" data-mode="sprint-10"><b>10問</b><span class="best" data-best="sprint-10"></span><span class="k">[3]</span></button>
-          <button class="vbtn" data-mode="sprint-20"><b>20問</b><span class="best" data-best="sprint-20"></span><span class="k">[4]</span></button>
-          <button class="vbtn" data-mode="sprint-30"><b>30問</b><span class="best" data-best="sprint-30"></span><span class="k">[5]</span></button>
+          <button class="vbtn" data-mode="count-10"><b>10問</b><span class="best" data-best="count-10"></span><span class="k">[3]</span></button>
+          <button class="vbtn" data-mode="count-20"><b>20問</b><span class="best" data-best="count-20"></span><span class="k">[4]</span></button>
+          <button class="vbtn" data-mode="count-30"><b>30問</b><span class="best" data-best="count-30"></span><span class="k">[5]</span></button>
         </div>
       </div>
       <div class="mode m-endless">
@@ -371,7 +371,7 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
   <section id="game" class="screen" hidden>
     <header class="hud">
       <div class="hud-l">
-        <div class="mode-label" id="hMode">TIME ATTACK</div>
+        <div class="mode-label" id="hMode">SPRINT</div>
         <div class="time" id="hTime">60.0</div>
         <div class="bar"><i id="hBar"></i></div>
       </div>
@@ -470,7 +470,7 @@ body.fever .qcard { box-shadow: 0 0 0 2px var(--gold), 0 0 60px -6px var(--hot),
 <script>
 'use strict';
 /* バージョン：お題や機能を追加したら MINOR、修正は PATCH を上げる（README の更新履歴も追記） */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const SITE_URL = 'https://kedama-t.github.io/dopa-type/';
 const HASHTAG = 'DOPATYPE';
 /* =========================================================
@@ -1916,6 +1916,17 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem('dopatype:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('dopatype:' + k, JSON.stringify(v)); } catch (e) { } },
 };
+// v1.1 以前のモード ID で保存された自己ベストを新 ID に移す（一度だけ）
+(function migrateStorage() {
+  if (store.get('schema', 1) >= 2) return;
+  const map = { 'time-60': 'timed-60', 'time-180': 'timed-180', 'sprint-10': 'count-10', 'sprint-20': 'count-20', 'sprint-30': 'count-30' };
+  for (const [from, to] of Object.entries(map)) {
+    const v = store.get('best:' + from, null);
+    if (v != null && store.get('best:' + to, null) == null) store.set('best:' + to, v);
+    try { localStorage.removeItem('dopatype:best:' + from); } catch (e) { }
+  }
+  store.set('schema', 2);
+})();
 const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SET = {
   sound: store.get('sound', true),
@@ -2122,8 +2133,8 @@ const Bgm = {
     return b;
   },
   ready() { return !!(this.ctx && this.n && SET.sound && SET.bgm); },
-  trackKey() { return this.cfg.mode === 'time' && this.cfg.limit === 60 ? 'short' : 'long'; },
-  looping() { return this.cfg.mode !== 'time'; },
+  trackKey() { return this.cfg.mode === 'timed' && this.cfg.limit === 60 ? 'short' : 'long'; },
+  looping() { return this.cfg.mode !== 'timed'; },
 
   // when: AudioContext 時刻。ここが曲頭＝計測開始
   start(cfg, when) {
@@ -2178,10 +2189,10 @@ const Bgm = {
     for (const s of this.srcs) { try { s.stop(t + fade + 0.05); } catch (e) { } }
     this.srcs = [];
   },
-  // タイムアタックは曲を最後(余韻込み)まで流しきる。それ以外はフェードアウト
+  // 制限時間制（スプリント）は曲を最後(余韻込み)まで流しきる。それ以外はフェードアウト
   finish(cfg) {
     if (!this.ctx || !this.n) return;
-    if (cfg.mode === 'time') { this.gen++; clearInterval(this.timer); return; }
+    if (cfg.mode === 'timed') { this.gen++; clearInterval(this.timer); return; }
     this.stop(2.5);
   },
 
@@ -2374,12 +2385,13 @@ function rectCenter(el) { const r = el.getBoundingClientRect(); return { x: r.le
 /* =========================================================
    ゲーム本体
    ========================================================= */
+// ID はルールの中身で付ける（timed = 制限時間制 / count = 問題数制）。表示名は label と MODE_JA で変える
 const MODES = {
-  'time-60': { mode: 'time', limit: 60, label: 'TIME ATTACK · 60s' },
-  'time-180': { mode: 'time', limit: 180, label: 'TIME ATTACK · 180s' },
-  'sprint-10': { mode: 'sprint', count: 10, label: 'SPRINT · 10 WORDS' },
-  'sprint-20': { mode: 'sprint', count: 20, label: 'SPRINT · 20 WORDS' },
-  'sprint-30': { mode: 'sprint', count: 30, label: 'SPRINT · 30 WORDS' },
+  'timed-60': { mode: 'timed', limit: 60, label: 'SPRINT · 60s' },
+  'timed-180': { mode: 'timed', limit: 180, label: 'SPRINT · 180s' },
+  'count-10': { mode: 'count', count: 10, label: 'TIME ATTACK · 10 WORDS' },
+  'count-20': { mode: 'count', count: 20, label: 'TIME ATTACK · 20 WORDS' },
+  'count-30': { mode: 'count', count: 30, label: 'TIME ATTACK · 30 WORDS' },
   'endless': { mode: 'endless', label: 'ENDLESS' },
 };
 const TIERS = [0, 30, 60, 100, 150, 220];
@@ -2390,7 +2402,7 @@ const tierOf = c => { let t = 0; for (let i = 0; i < TIERS.length; i++) if (c >=
 let screen = 'title';
 let G = null;
 let resultAt = 0;
-let lastMode = 'time-60';
+let lastMode = 'timed-60';
 
 function showScreen(id) {
   for (const s of ['title', 'game', 'result']) $('#' + s).hidden = s !== id;
@@ -2465,9 +2477,9 @@ function nextQuestion(first) {
   G.wordMiss = 0; G.wordKeys = 0; G.wordStart = now();
   $('#qTextBase').textContent = G.q[0];
   $('#qTextOver').textContent = G.q[0];
-  $('#qNum').textContent = G.mode === 'sprint' ? `Q.${G.qn} / ${G.cfg.count}` : `Q.${G.qn}`;
+  $('#qNum').textContent = G.mode === 'count' ? `Q.${G.qn} / ${G.cfg.count}` : `Q.${G.qn}`;
   const nx = G.deck[G.deck.length - 1];
-  const showNext = !(G.mode === 'sprint' && G.qn >= G.cfg.count);
+  const showNext = !(G.mode === 'count' && G.qn >= G.cfg.count);
   $('#next').innerHTML = showNext && nx ? `<b>NEXT</b>${nx[0]}` : '';
   renderQ();
   if (!first) {
@@ -2617,7 +2629,7 @@ function completeWord() {
   bump($('#hScore'), 1.12, 200);
   if (MILESTONES.includes(G.combo)) milestone(G.combo);
 
-  if (G.mode === 'sprint' && G.words >= G.cfg.count) { updateHud(); finish('CLEAR!!'); return; }
+  if (G.mode === 'count' && G.words >= G.cfg.count) { updateHud(); finish('CLEAR!!'); return; }
   G.state = 'play';
   nextQuestion(false);
   updateHud();
@@ -2646,7 +2658,7 @@ function updateHud(force) {
 function updateTimer() {
   const el = G.startT ? elapsed() : 0;
   const t = $('#hTime'), bar = $('#hBar');
-  if (G.mode === 'time') {
+  if (G.mode === 'timed') {
     const left = Math.max(0, G.cfg.limit * 1000 - el);
     t.textContent = (left / 1000).toFixed(1);
     bar.style.width = (left / (G.cfg.limit * 1000) * 100) + '%';
@@ -2659,7 +2671,7 @@ function updateTimer() {
       }
       if (left <= 0) finish('TIME UP!!');
     }
-  } else if (G.mode === 'sprint') {
+  } else if (G.mode === 'count') {
     t.textContent = (el / 1000).toFixed(2);
     bar.style.width = (G.words / G.cfg.count * 100) + '%';
   } else {
@@ -2783,17 +2795,17 @@ function showResult() {
   rankEl.className = 'rank' + (['C', 'D'].includes(rk[1]) ? ' r-low' : '');
   $('#rRankName').textContent = rk[2];
   $('#rMode').textContent = G.cfg.label;
-  $('#rTitle').textContent = G.mode === 'sprint' ? 'CLEAR!' : 'RESULT';
+  $('#rTitle').textContent = G.mode === 'count' ? 'CLEAR!' : 'RESULT';
 
   let prim, primLabel, better, bestText;
   const key = 'best:' + G.id;
   const prev = store.get(key, null);
-  if (G.mode === 'time') {
+  if (G.mode === 'timed') {
     primLabel = 'SCORE'; prim = fmt(G.score);
     better = prev == null || G.score > prev;
     if (better) store.set(key, Math.round(G.score));
     bestText = prev == null ? '初記録' : `自己ベスト ${fmt(Math.max(prev, G.score))}`;
-  } else if (G.mode === 'sprint') {
+  } else if (G.mode === 'count') {
     primLabel = 'CLEAR TIME'; prim = fmtSec(el);
     better = prev == null || el < prev;
     if (better) store.set(key, Math.round(el));
@@ -2811,8 +2823,8 @@ function showResult() {
   $('#rBest').textContent = bestText;
 
   const items = [];
-  if (G.mode !== 'time') items.push(['スコア', fmt(G.score)]);
-  if (G.mode !== 'sprint') items.push(['プレイ時間', G.mode === 'time' ? G.cfg.limit + 's' : fmtClock(el)]);
+  if (G.mode !== 'timed') items.push(['スコア', fmt(G.score)]);
+  if (G.mode !== 'count') items.push(['プレイ時間', G.mode === 'timed' ? G.cfg.limit + 's' : fmtClock(el)]);
   items.push(['KPM（打/分）', fmt(kpm)], ['打/秒', (kpm / 60).toFixed(2)], ['正確率', acc.toFixed(1) + '%'],
     ['正打鍵', fmt(G.correct)], ['ミス', fmt(G.miss)], ['最大コンボ', fmt(G.maxCombo)], ['クリア数', G.words + '問'], ['PERFECT', G.perfects + '問']);
   if (G.mode === 'endless') {
@@ -2825,7 +2837,7 @@ function showResult() {
 
   const shareStats = G.mode === 'endless'
     ? [['直近1分 KPM', fmt(windowStats(60000).kpm)], ['最高 1分KPM', el >= 60000 ? fmt(G.best1) : '-'], ['正確率', acc.toFixed(1) + '%'], ['プレイ時間', fmtClock(el)]]
-    : [['KPM', fmt(kpm)], ['正確率', acc.toFixed(1) + '%'], ['最大コンボ', fmt(G.maxCombo)], G.mode === 'time' ? ['クリア数', G.words + '問'] : ['ミス', fmt(G.miss)]];
+    : [['KPM', fmt(kpm)], ['正確率', acc.toFixed(1) + '%'], ['最大コンボ', fmt(G.maxCombo)], G.mode === 'timed' ? ['クリア数', G.words + '問'] : ['ミス', fmt(G.miss)]];
   lastShare = {
     mode: G.mode, modeJa: MODE_JA[G.id], label: G.cfg.label, rank: rk[1], rankName: rk[2],
     primLabel, prim, kpm: fmt(kpm), acc: acc.toFixed(1), stats: shareStats, at: new Date(),
@@ -2850,8 +2862,8 @@ function showResult() {
 
 /* ---------- 結果シェア（画像はブラウザ内で生成。サーバー不要） ---------- */
 const MODE_JA = {
-  'time-60': 'タイムアタック60秒', 'time-180': 'タイムアタック180秒',
-  'sprint-10': 'スプリント10問', 'sprint-20': 'スプリント20問', 'sprint-30': 'スプリント30問', 'endless': 'エンドレス',
+  'timed-60': 'スプリント60秒', 'timed-180': 'スプリント180秒',
+  'count-10': 'タイムアタック10問', 'count-20': 'タイムアタック20問', 'count-30': 'タイムアタック30問', 'endless': 'エンドレス',
 };
 let lastShare = null, shareBlob = null, shareUrl = '';
 const fileShareOK = () => {
@@ -2859,9 +2871,9 @@ const fileShareOK = () => {
 };
 
 function shareText(r) {
-  const head = r.mode === 'sprint' ? `${r.modeJa}を ${r.prim} でクリア！` : `${r.modeJa}で ${r.rank} ランク！`;
-  const body = r.mode === 'time' ? `スコア ${r.prim} / ${r.kpm} KPM / 正確率 ${r.acc}%`
-    : r.mode === 'sprint' ? `${r.rank} ランク / ${r.kpm} KPM / 正確率 ${r.acc}%`
+  const head = r.mode === 'count' ? `${r.modeJa}を ${r.prim} でクリア！` : `${r.modeJa}で ${r.rank} ランク！`;
+  const body = r.mode === 'timed' ? `スコア ${r.prim} / ${r.kpm} KPM / 正確率 ${r.acc}%`
+    : r.mode === 'count' ? `${r.rank} ランク / ${r.kpm} KPM / 正確率 ${r.acc}%`
     : `平均 ${r.prim} KPM / 正確率 ${r.acc}%`;
   return `DOPA TYPE ${head}\n${body}`;
 }
@@ -2921,8 +2933,8 @@ async function renderShareImage(r) {
   const px = 610, pw = W - 54 - px;
   x.textAlign = 'left';
   x.font = `16px ${F.num}`; x.fillStyle = '#a39bd8'; x.fillText(r.primLabel.split('').join(' '), px, 196);
-  // スプリントは「5.86s」を数値＋小さな単位に分けて描く
-  const unit = r.mode === 'sprint' ? 'SEC' : '';
+  // 問題数制（タイムアタック）は「5.86s」を数値＋小さな単位に分けて描く
+  const unit = r.mode === 'count' ? 'SEC' : '';
   const pv = unit ? r.prim.replace(/s$/, '') : r.prim;
   x.font = `28px ${F.num}`; const uw = unit ? x.measureText(unit).width + 14 : 0;
   const ps = fit(pv, F.num, 96, pw - uw);
@@ -3023,7 +3035,7 @@ function refreshBests() {
   document.querySelectorAll('[data-best]').forEach(el => {
     const id = el.dataset.best, v = store.get('best:' + id, null);
     if (v == null) { el.textContent = ''; return; }
-    el.textContent = id.startsWith('time') ? 'BEST ' + fmt(v) : id.startsWith('sprint') ? 'BEST ' + fmtSec(v) : 'BEST ' + fmt(v) + ' KPM';
+    el.textContent = id.startsWith('timed') ? 'BEST ' + fmt(v) : id.startsWith('count') ? 'BEST ' + fmtSec(v) : 'BEST ' + fmt(v) + ' KPM';
   });
 }
 
@@ -3035,7 +3047,7 @@ function imeWarn() {
   const el = $('#ime'); el.hidden = false;
   clearTimeout(imeTimer); imeTimer = setTimeout(() => { el.hidden = true; }, 2200);
 }
-const TITLE_KEYS = { '1': 'time-60', '2': 'time-180', '3': 'sprint-10', '4': 'sprint-20', '5': 'sprint-30', '6': 'endless' };
+const TITLE_KEYS = { '1': 'timed-60', '2': 'timed-180', '3': 'count-10', '4': 'count-20', '5': 'count-30', '6': 'endless' };
 
 document.addEventListener('keydown', e => {
   if (screen === 'title') {
